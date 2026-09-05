@@ -12,23 +12,38 @@ router.use(telegramAuthMiddleware);
 
 // --- User Profile & Health ---
 router.get('/me', async (req, res) => {
-  const tracks = await storage.getAllTracks();
-  const playlists = await storage.getAllPlaylists();
-  res.json({
-    user: req.telegramUser,
-    isOwner: true,
-    totalTracks: tracks.length,
-    totalPlaylists: playlists.length
-  });
+  try {
+    const tracks = await storage.getAllTracks();
+    const playlists = await storage.getAllPlaylists();
+    res.json({
+      user: req.telegramUser,
+      isOwner: true,
+      totalTracks: tracks.length,
+      totalPlaylists: playlists.length
+    });
+  } catch (err) {
+    console.error('[API /me Error]', err.message);
+    res.json({
+      user: req.telegramUser,
+      isOwner: true,
+      totalTracks: 0,
+      totalPlaylists: 0
+    });
+  }
 });
 
 // --- Track Routes ---
 
 // List all tracks (supports ?q= query)
 router.get('/tracks', async (req, res) => {
-  const query = req.query.q || '';
-  const tracks = await storage.getAllTracks(query);
-  res.json({ tracks });
+  try {
+    const query = req.query.q || '';
+    const tracks = await storage.getAllTracks(query);
+    res.json({ tracks });
+  } catch (err) {
+    console.error('[API /tracks Error]', err.message);
+    res.json({ tracks: [] });
+  }
 });
 
 // Get single track metadata

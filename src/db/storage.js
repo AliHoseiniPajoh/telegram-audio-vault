@@ -6,16 +6,43 @@ const { config } = require('../config');
 const storageDir = process.env.VERCEL ? '/tmp' : config.dataDir;
 const DB_FILE = path.join(storageDir, 'vault.json');
 
-// Upstash / Vercel KV environment variables (supports all Vercel prefixes: KV_, UPSTASH_, STORAGE_)
-const KV_URL = process.env.KV_REST_API_URL || 
-               process.env.UPSTASH_REDIS_REST_URL || 
-               process.env.STORAGE_REST_API_URL || 
-               process.env.STORAGE_URL || '';
+/**
+ * Safely extracts ONLY HTTPS REST API endpoints for Upstash / Vercel KV.
+ * Strictly ignores TCP redis:// URLs (like STORAGE_URL, REDIS_URL, KV_URL) which crash fetch().
+ */
+function getRestEndpoint() {
+  const urlCandidates = [
+    process.env.STORAGE_REST_API_URL,
+    process.env.KV_REST_API_URL,
+    process.env.UPSTASH_REDIS_REST_URL
+  ];
+  const tokenCandidates = [
+    process.env.STORAGE_REST_API_TOKEN,
+    process.env.KV_REST_API_TOKEN,
+    process.env.UPSTASH_REDIS_REST_TOKEN
+  ];
 
-const KV_TOKEN = process.env.KV_REST_API_TOKEN || 
-                 process.env.UPSTASH_REDIS_REST_TOKEN || 
-                 process.env.STORAGE_REST_API_TOKEN || 
-                 process.env.STORAGE_TOKEN || '';
+  let validUrl = '';
+  for (const u of urlCandidates) {
+    if (u && typeof u === 'string' && u.trim().startsWith('https://')) {
+      validUrl = u.trim();
+      break;
+    }
+  }
+
+  let validToken = '';
+  for (const t of tokenCandidates) {
+    if (t && typeof t === 'string' && t.trim().length > 0) {
+      validToken = t.trim();
+      break;
+    }
+  }
+
+  if (validUrl && validToken) {
+    return { url: validUrl, token: validToken };
+  }
+  return null;
+}
 
 const defaultState = {
   tracks: [],
@@ -49,10 +76,13 @@ class Storage {
     try {
       if (fs.existsSync(DB_FILE)) {
         const content = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(content);
+        const parsed = JSON.parse(content);
+        if (parsed && Array.isArray(parsed.tracks)) {
+          return parsed;
+        }
       }
     } catch (err) {
-      console.error('[Storage Error] Failed to read database:', err.message);
+      console.error('[Storage] Local read error:', err.message);
     }
     this.saveLocal(defaultState);
     return JSON.parse(JSON.stringify(defaultState));
@@ -65,62 +95,79 @@ class Storage {
       fs.writeFileSync(tmpFile, JSON.stringify(dataToSave, null, 2), 'utf-8');
       fs.renameSync(tmpFile, DB_FILE);
     } catch (err) {
-      console.error('[Storage Error] Local save error:', err.message);
+      console.error('[Storage] Local save error:', err.message);
     }
   }
 
-  // Standard Upstash Redis / Vercel KV REST Integration
+  // Safe Cloud Sync with 2s timeout and error suppression to prevent 500 errors
   async syncFromKV() {
-    if (!KV_URL || !KV_TOKEN) return;
+    const kv = getRestEndpoint();
+    if (!kv) return;
+
     try {
-      const res = await fetch(KV_URL, {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2000);
+
+      const res = await fetch(kv.url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${KV_TOKEN}`,
+          Authorization: `Bearer ${kv.token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(['GET', 'telegram_audio_vault_data'])
+        body: JSON.stringify(['GET', 'telegram_audio_vault_data']),
+        signal: controller.signal
       });
-      const json = await res.json();
-      if (json && json.result) {
-        this.data = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
-        this.saveLocal(this.data);
+      clearTimeout(timer);
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.result) {
+          const parsed = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
+          if (parsed && Array.isArray(parsed.tracks)) {
+            this.data = parsed;
+            this.saveLocal(this.data);
+          }
+        }
       }
     } catch (err) {
-      console.warn('[KV Error] Sync from cloud KV error:', err.message);
+      console.warn('[Storage] Cloud sync skipped (fallback to local):', err.message);
     }
   }
 
   async syncToKV() {
-    if (!KV_URL || !KV_TOKEN) return;
+    const kv = getRestEndpoint();
+    if (!kv) return;
+
     try {
-      await fetch(KV_URL, {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2000);
+
+      await fetch(kv.url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${KV_TOKEN}`,
+          Authorization: `Bearer ${kv.token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(['SET', 'telegram_audio_vault_data', JSON.stringify(this.data)])
+        body: JSON.stringify(['SET', 'telegram_audio_vault_data', JSON.stringify(this.data)]),
+        signal: controller.signal
       });
+      clearTimeout(timer);
     } catch (err) {
-      console.warn('[KV Error] Push to cloud KV error:', err.message);
+      console.warn('[Storage] Cloud push skipped:', err.message);
     }
   }
 
   async save(dataToSave = this.data) {
     this.saveLocal(dataToSave);
-    if (KV_URL && KV_TOKEN) {
-      await this.syncToKV();
-    }
+    await this.syncToKV();
   }
 
   // --- Track Methods ---
 
   async getAllTracks(query = '') {
-    if (KV_URL && KV_TOKEN) {
-      await this.syncFromKV();
-    }
-    let tracks = [...this.data.tracks];
+    await this.syncFromKV();
+
+    let tracks = [...(this.data.tracks || [])];
     if (query && typeof query === 'string') {
       const q = query.toLowerCase().trim();
       tracks = tracks.filter(
@@ -134,20 +181,18 @@ class Storage {
   }
 
   async getTrackById(id) {
-    if (KV_URL && KV_TOKEN) {
-      await this.syncFromKV();
-    }
-    return this.data.tracks.find((t) => t.id === id) || null;
+    await this.syncFromKV();
+    return (this.data.tracks || []).find((t) => t.id === id) || null;
   }
 
   getTrackByFileUniqueId(fileUniqueId) {
-    return this.data.tracks.find((t) => t.fileUniqueId === fileUniqueId) || null;
+    return (this.data.tracks || []).find((t) => t.fileUniqueId === fileUniqueId) || null;
   }
 
   getOrCreatePlaylistByName(name) {
-    if (!name || typeof name !== 'string') return this.data.playlists[0] || null;
+    if (!name || typeof name !== 'string') return (this.data.playlists || [])[0] || null;
     const cleanName = name.trim();
-    const existing = this.data.playlists.find(
+    const existing = (this.data.playlists || []).find(
       (p) => p.name.toLowerCase() === cleanName.toLowerCase()
     );
     if (existing) return existing;
@@ -155,16 +200,14 @@ class Storage {
   }
 
   async addTrack(metadata, playlistId = null) {
-    if (KV_URL && KV_TOKEN) {
-      await this.syncFromKV();
-    }
+    await this.syncFromKV();
 
     const existing = this.getTrackByFileUniqueId(metadata.fileUniqueId);
     if (existing) {
       existing.fileId = metadata.fileId;
       existing.updatedAt = new Date().toISOString();
       if (playlistId) {
-        const pl = this.data.playlists.find((p) => p.id === playlistId);
+        const pl = (this.data.playlists || []).find((p) => p.id === playlistId);
         if (pl && !pl.trackIds.includes(existing.id)) {
           pl.trackIds.push(existing.id);
         }
@@ -187,17 +230,32 @@ class Storage {
       createdAt: new Date().toISOString()
     };
 
+    if (!Array.isArray(this.data.tracks)) {
+      this.data.tracks = [];
+    }
     this.data.tracks.push(newTrack);
 
     // Auto-add to target playlist OR default Favorites playlist
+    if (!Array.isArray(this.data.playlists) || this.data.playlists.length === 0) {
+      this.data.playlists = [
+        {
+          id: 'pl_favorites',
+          name: 'Favorites',
+          isDefault: true,
+          trackIds: [],
+          createdAt: new Date().toISOString()
+        }
+      ];
+    }
+
     if (playlistId) {
       const pl = this.data.playlists.find((p) => p.id === playlistId);
       if (pl && !pl.trackIds.includes(newTrack.id)) {
         pl.trackIds.push(newTrack.id);
       }
-    } else if (this.data.playlists.length > 0) {
+    } else {
       const defaultPl = this.data.playlists[0];
-      if (!defaultPl.trackIds.includes(newTrack.id)) {
+      if (defaultPl && !defaultPl.trackIds.includes(newTrack.id)) {
         defaultPl.trackIds.push(newTrack.id);
       }
     }
@@ -207,19 +265,17 @@ class Storage {
   }
 
   async deleteTrack(id) {
-    if (KV_URL && KV_TOKEN) {
-      await this.syncFromKV();
-    }
+    await this.syncFromKV();
 
-    const initialCount = this.data.tracks.length;
-    this.data.tracks = this.data.tracks.filter((t) => t.id !== id);
+    const initialCount = (this.data.tracks || []).length;
+    this.data.tracks = (this.data.tracks || []).filter((t) => t.id !== id);
 
     if (this.data.tracks.length === initialCount) {
       return false;
     }
 
-    this.data.playlists.forEach((pl) => {
-      pl.trackIds = pl.trackIds.filter((tid) => tid !== id);
+    (this.data.playlists || []).forEach((pl) => {
+      pl.trackIds = (pl.trackIds || []).filter((tid) => tid !== id);
     });
 
     await this.save();
@@ -229,24 +285,20 @@ class Storage {
   // --- Playlist Methods ---
 
   async getAllPlaylists() {
-    if (KV_URL && KV_TOKEN) {
-      await this.syncFromKV();
-    }
-    return this.data.playlists.map((pl) => ({
+    await this.syncFromKV();
+    return (this.data.playlists || []).map((pl) => ({
       ...pl,
-      trackCount: pl.trackIds.length
+      trackCount: (pl.trackIds || []).length
     }));
   }
 
   async getPlaylistById(id) {
-    if (KV_URL && KV_TOKEN) {
-      await this.syncFromKV();
-    }
-    const pl = this.data.playlists.find((p) => p.id === id);
+    await this.syncFromKV();
+    const pl = (this.data.playlists || []).find((p) => p.id === id);
     if (!pl) return null;
 
-    const tracks = pl.trackIds
-      .map((tid) => this.data.tracks.find((t) => t.id === tid))
+    const tracks = (pl.trackIds || [])
+      .map((tid) => (this.data.tracks || []).find((t) => t.id === tid))
       .filter(Boolean);
 
     return {
@@ -268,31 +320,32 @@ class Storage {
       createdAt: new Date().toISOString()
     };
 
+    if (!Array.isArray(this.data.playlists)) {
+      this.data.playlists = [];
+    }
     this.data.playlists.push(newPlaylist);
     await this.save();
     return newPlaylist;
   }
 
   async deletePlaylist(id) {
-    const pl = this.data.playlists.find((p) => p.id === id);
+    const pl = (this.data.playlists || []).find((p) => p.id === id);
     if (!pl) return false;
     if (pl.isDefault) {
       throw new Error('Cannot delete default playlist');
     }
 
-    this.data.playlists = this.data.playlists.filter((p) => p.id !== id);
+    this.data.playlists = (this.data.playlists || []).filter((p) => p.id !== id);
     await this.save();
     return true;
   }
 
   async addTrackToPlaylist(playlistId, trackId) {
-    if (KV_URL && KV_TOKEN) {
-      await this.syncFromKV();
-    }
-    const pl = this.data.playlists.find((p) => p.id === playlistId);
+    await this.syncFromKV();
+    const pl = (this.data.playlists || []).find((p) => p.id === playlistId);
     if (!pl) throw new Error('Playlist not found');
 
-    const track = this.data.tracks.find((t) => t.id === trackId);
+    const track = (this.data.tracks || []).find((t) => t.id === trackId);
     if (!track) throw new Error('Track not found');
 
     if (!pl.trackIds.includes(trackId)) {
@@ -303,13 +356,11 @@ class Storage {
   }
 
   async removeTrackFromPlaylist(playlistId, trackId) {
-    if (KV_URL && KV_TOKEN) {
-      await this.syncFromKV();
-    }
-    const pl = this.data.playlists.find((p) => p.id === playlistId);
+    await this.syncFromKV();
+    const pl = (this.data.playlists || []).find((p) => p.id === playlistId);
     if (!pl) throw new Error('Playlist not found');
 
-    pl.trackIds = pl.trackIds.filter((tid) => tid !== trackId);
+    pl.trackIds = (pl.trackIds || []).filter((tid) => tid !== trackId);
     await this.save();
     return pl;
   }
