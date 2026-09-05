@@ -105,6 +105,13 @@ const ApiClient = {
     }
     // Fallback in local dev
     return `/api/stream/${encodeURIComponent(fileId)}`;
+  },
+
+  // Send audio file directly to Telegram chat for 0-second native playback
+  async playNative(trackId) {
+    return this.request(`/tracks/${trackId}/play-native`, {
+      method: 'POST'
+    });
   }
 };
 

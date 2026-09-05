@@ -7,6 +7,13 @@ const { config } = require('../config');
 
 const router = express.Router();
 
+const httpsKeepAliveAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 50,
+  maxFreeSockets: 10,
+  timeout: 60000
+});
+
 // Apply Telegram Auth & Whitelist to all API endpoints
 router.use(telegramAuthMiddleware);
 
@@ -40,6 +47,22 @@ router.get('/tracks', async (req, res) => {
     const query = req.query.q || '';
     const tracks = await storage.getAllTracks(query);
     res.json({ tracks });
+
+    // Background pre-warm links for top tracks to eliminate getFile lookup latency
+    const bot = getBot();
+    if (bot && Array.isArray(tracks)) {
+      tracks.slice(0, 5).forEach((t) => {
+        if (t.fileId && !streamLinkCache.has(t.fileId)) {
+          bot.telegram
+            .getFileLink(t.fileId)
+            .then((link) => {
+              streamLinkCache.set(t.fileId, link.href);
+              setTimeout(() => streamLinkCache.delete(t.fileId), 50 * 60 * 1000);
+            })
+            .catch(() => {});
+        }
+      });
+    }
   } catch (err) {
     console.error('[API /tracks Error]', err.message);
     res.json({ tracks: [] });
@@ -157,7 +180,8 @@ function streamAudioFromUrl(targetUrlStr, reqHeaders, res, maxRedirects = 3) {
         port: targetUrl.port || 443,
         path: targetUrl.pathname + targetUrl.search,
         method: 'GET',
-        headers
+        headers,
+        agent: httpsKeepAliveAgent
       },
       (proxyRes) => {
         // Follow redirect internally if any
@@ -165,19 +189,79 @@ function streamAudioFromUrl(targetUrlStr, reqHeaders, res, maxRedirects = 3) {
           return streamAudioFromUrl(proxyRes.headers.location, reqHeaders, res, maxRedirects - 1);
         }
 
-        const resHeaders = {
-          'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg',
-          'Accept-Ranges': 'bytes',
-          'Cache-Control': 'public, max-age=31536000, immutable'
-        };
-        if (proxyRes.headers['content-length']) {
-          resHeaders['Content-Length'] = proxyRes.headers['content-length'];
-        }
-        if (proxyRes.headers['content-range']) {
-          resHeaders['Content-Range'] = proxyRes.headers['content-range'];
+        // If upstream handled Range (206) or client didn't request Range
+        if (proxyRes.statusCode === 206 || !reqHeaders.range) {
+          const resHeaders = {
+            'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg',
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable'
+          };
+          if (proxyRes.headers['content-length']) {
+            resHeaders['Content-Length'] = proxyRes.headers['content-length'];
+          }
+          if (proxyRes.headers['content-range']) {
+            resHeaders['Content-Range'] = proxyRes.headers['content-range'];
+          }
+
+          res.writeHead(proxyRes.statusCode, resHeaders);
+          return proxyRes.pipe(res);
         }
 
-        res.writeHead(proxyRes.statusCode, resHeaders);
+        // Upstream returned 200, but client requested a byte range (e.g. bytes=0-1 or bytes=0-)
+        const totalLength = parseInt(proxyRes.headers['content-length'], 10);
+        const match = reqHeaders.range.match(/bytes=(\d+)-(\d*)/);
+        if (match && !isNaN(totalLength)) {
+          const start = parseInt(match[1], 10);
+          const end = match[2] ? parseInt(match[2], 10) : totalLength - 1;
+          const chunkSize = end - start + 1;
+
+          res.writeHead(206, {
+            'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg',
+            'Content-Range': `bytes ${start}-${end}/${totalLength}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize,
+            'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable'
+          });
+
+          if (start === 0 && end === totalLength - 1) {
+            return proxyRes.pipe(res);
+          }
+
+          let bytesPassed = 0;
+          proxyRes.on('data', (chunk) => {
+            const prevBytes = bytesPassed;
+            bytesPassed += chunk.length;
+            if (bytesPassed <= start) return;
+
+            let chunkStart = 0;
+            if (prevBytes < start) {
+              chunkStart = start - prevBytes;
+            }
+            let chunkEnd = chunk.length;
+            if (bytesPassed > end + 1) {
+              chunkEnd = chunk.length - (bytesPassed - (end + 1));
+            }
+            if (chunkStart < chunkEnd) {
+              res.write(chunk.slice(chunkStart, chunkEnd));
+            }
+            if (bytesPassed >= end + 1) {
+              proxyReq.destroy();
+              res.end();
+            }
+          });
+
+          proxyRes.on('end', () => {
+            if (!res.writableEnded) res.end();
+          });
+          return;
+        }
+
+        // Fallback for any other case
+        res.writeHead(200, {
+          'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg',
+          'Accept-Ranges': 'bytes',
+          'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable'
+        });
         proxyRes.pipe(res);
       }
     );
@@ -223,6 +307,38 @@ router.get('/stream/:fileId', async (req, res) => {
     if (!res.headersSent) {
       res.status(404).json({ error: 'Audio file not found or expired on Telegram server' });
     }
+  }
+});
+
+// --- Instant Native Telegram Playback ---
+// Sends the audio message directly to the owner's Telegram chat so it plays instantly from local cache with 0 downloads!
+router.post('/tracks/:id/play-native', async (req, res) => {
+  const { id } = req.params;
+  const bot = getBot();
+
+  if (!bot) {
+    return res.status(503).json({ error: 'Telegram Bot is not initialized' });
+  }
+
+  try {
+    const track = await storage.getTrackById(id);
+    if (!track) {
+      return res.status(404).json({ error: 'Track not found' });
+    }
+
+    const targetChatId = req.telegramUser?.id || config.allowedUserId;
+    if (!targetChatId) {
+      return res.status(400).json({ error: 'User ID unknown' });
+    }
+
+    await bot.telegram.sendAudio(targetChatId, track.fileId, {
+      caption: `🎵 ${track.title} - ${track.performer}\n(پخش در پلیر اصلی تلگرام)`
+    });
+
+    res.json({ success: true, message: 'فایل صوتی به چت تلگرام شما ارسال شد.' });
+  } catch (err) {
+    console.error('[Play Native Error]', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

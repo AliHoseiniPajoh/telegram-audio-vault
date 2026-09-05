@@ -50,6 +50,7 @@ const UI = {
       btnSpeed: document.getElementById('btn-speed'),
       btnQueue: document.getElementById('btn-queue'),
       btnLike: document.getElementById('btn-like'),
+      btnPlayNative: document.getElementById('btn-play-native'),
       btnAddToPl: document.getElementById('btn-add-to-pl'),
 
       // Modals & Toast
@@ -163,6 +164,21 @@ const UI = {
     if (this.dom.btnQueue) {
       this.dom.btnQueue.addEventListener('click', () => {
         this.openQueueModal();
+      });
+    }
+
+    if (this.dom.btnPlayNative) {
+      this.dom.btnPlayNative.addEventListener('click', async () => {
+        const track = window.AudioEngine.getCurrentTrack();
+        if (!track) return;
+        window.TelegramBridge.haptic.impact('medium');
+        this.showToast('در حال ارسال به چت تلگرام...');
+        try {
+          await window.ApiClient.playNative(track.id);
+          this.showToast('✅ فایل به تلگرام ارسال شد! بدون دانلود پلی کنید.');
+        } catch (err) {
+          this.showToast('❌ خطا در ارسال: ' + (err.message || 'ناموفق'));
+        }
       });
     }
 
@@ -418,6 +434,9 @@ const UI = {
             </div>
           </div>
           <div class="track-actions">
+            <button class="track-action-btn play-native" data-id="${track.id}" title="ارسال به چت تلگرام (پخش فوری در پلیر تلگرام بدون دانلود)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
             <button class="track-action-btn add-to-pl" data-id="${track.id}" title="افزودن به پلی‌لیست">
               ${Icons.plus}
             </button>
@@ -438,6 +457,21 @@ const UI = {
         const index = parseInt(item.dataset.index, 10);
         window.TelegramBridge.haptic.impact('light');
         window.AudioEngine.setQueue(tracks, index, true);
+      });
+    });
+
+    // Bind Play Native in Telegram
+    this.dom.contentView.querySelectorAll('.play-native').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        window.TelegramBridge.haptic.impact('medium');
+        this.showToast('در حال ارسال به چت تلگرام...');
+        try {
+          await window.ApiClient.playNative(btn.dataset.id);
+          this.showToast('✅ فایل به تلگرام ارسال شد! بدون دانلود پلی کنید.');
+        } catch (err) {
+          this.showToast('❌ خطا در ارسال: ' + (err.message || 'ناموفق'));
+        }
       });
     });
 

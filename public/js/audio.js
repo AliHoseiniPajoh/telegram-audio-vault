@@ -241,51 +241,14 @@ class AudioEngine {
         this.play();
       }
     } else {
-      // 2. Not yet cached: Stream from server and cache in background
+      // 2. Direct streaming: Dedicate 100% of bandwidth to the audio player for immediate playback
       this.audio.src = streamUrl;
       this.audio.playbackRate = this.playbackRate;
 
       if (autoPlay) {
         this.play();
       }
-
-      // Download and save to local phone cache for instant replay next time
-      fetch(streamUrl)
-        .then((res) => (res.ok ? res.blob() : null))
-        .then((blob) => {
-          if (blob && blob.size > 1000) {
-            AudioCache.put(track.fileId, blob);
-            console.log('[AudioCache] Track cached permanently to device storage:', track.title);
-          }
-        })
-        .catch(() => {});
     }
-
-    // Preload next track in queue to cache
-    this.preloadNextTrack();
-  }
-
-  async preloadNextTrack() {
-    if (this.queue.length <= 1) return;
-    const nextIdx = (this.currentIndex + 1) % this.queue.length;
-    const nextTrack = this.queue[nextIdx];
-    if (!nextTrack) return;
-
-    try {
-      const exists = await AudioCache.get(nextTrack.fileId);
-      if (!exists) {
-        const nextUrl = window.ApiClient.getStreamUrl(nextTrack.fileId);
-        fetch(nextUrl)
-          .then((res) => (res.ok ? res.blob() : null))
-          .then((blob) => {
-            if (blob && blob.size > 1000) {
-              AudioCache.put(nextTrack.fileId, blob);
-              console.log('[AudioCache] Pre-cached next track in background:', nextTrack.title);
-            }
-          })
-          .catch(() => {});
-      }
-    } catch (_) {}
   }
 
   play() {

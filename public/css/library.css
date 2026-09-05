@@ -170,6 +170,16 @@
   color: var(--text-color);
 }
 
+.track-action-btn.play-native {
+  color: var(--button-color, #2ea6ff);
+}
+
+.track-action-btn.play-native:hover,
+.track-action-btn.play-native:active {
+  background: rgba(46, 166, 255, 0.12);
+  color: var(--button-color, #2ea6ff);
+}
+
 .track-action-btn.delete:active {
   color: var(--destructive-color);
 }
