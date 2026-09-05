@@ -11,27 +11,29 @@ const router = express.Router();
 router.use(telegramAuthMiddleware);
 
 // --- User Profile & Health ---
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
+  const tracks = await storage.getAllTracks();
+  const playlists = await storage.getAllPlaylists();
   res.json({
     user: req.telegramUser,
     isOwner: true,
-    totalTracks: storage.getAllTracks().length,
-    totalPlaylists: storage.getAllPlaylists().length
+    totalTracks: tracks.length,
+    totalPlaylists: playlists.length
   });
 });
 
 // --- Track Routes ---
 
 // List all tracks (supports ?q= query)
-router.get('/tracks', (req, res) => {
+router.get('/tracks', async (req, res) => {
   const query = req.query.q || '';
-  const tracks = storage.getAllTracks(query);
+  const tracks = await storage.getAllTracks(query);
   res.json({ tracks });
 });
 
 // Get single track metadata
-router.get('/tracks/:id', (req, res) => {
-  const track = storage.getTrackById(req.params.id);
+router.get('/tracks/:id', async (req, res) => {
+  const track = await storage.getTrackById(req.params.id);
   if (!track) {
     return res.status(404).json({ error: 'Track not found' });
   }
@@ -39,8 +41,8 @@ router.get('/tracks/:id', (req, res) => {
 });
 
 // Delete a track
-router.delete('/tracks/:id', (req, res) => {
-  const success = storage.deleteTrack(req.params.id);
+router.delete('/tracks/:id', async (req, res) => {
+  const success = await storage.deleteTrack(req.params.id);
   if (!success) {
     return res.status(404).json({ error: 'Track not found' });
   }
@@ -50,14 +52,14 @@ router.delete('/tracks/:id', (req, res) => {
 // --- Playlist Routes ---
 
 // List all playlists
-router.get('/playlists', (req, res) => {
-  const playlists = storage.getAllPlaylists();
+router.get('/playlists', async (req, res) => {
+  const playlists = await storage.getAllPlaylists();
   res.json({ playlists });
 });
 
 // Get single playlist with tracks
-router.get('/playlists/:id', (req, res) => {
-  const playlist = storage.getPlaylistById(req.params.id);
+router.get('/playlists/:id', async (req, res) => {
+  const playlist = await storage.getPlaylistById(req.params.id);
   if (!playlist) {
     return res.status(404).json({ error: 'Playlist not found' });
   }
@@ -65,14 +67,14 @@ router.get('/playlists/:id', (req, res) => {
 });
 
 // Create a new playlist
-router.post('/playlists', (req, res) => {
+router.post('/playlists', async (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Playlist name is required' });
   }
 
   try {
-    const playlist = storage.createPlaylist(name);
+    const playlist = await storage.createPlaylist(name);
     res.status(201).json({ playlist });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -80,9 +82,9 @@ router.post('/playlists', (req, res) => {
 });
 
 // Delete a playlist
-router.delete('/playlists/:id', (req, res) => {
+router.delete('/playlists/:id', async (req, res) => {
   try {
-    const success = storage.deletePlaylist(req.params.id);
+    const success = await storage.deletePlaylist(req.params.id);
     if (!success) {
       return res.status(404).json({ error: 'Playlist not found' });
     }
@@ -93,14 +95,14 @@ router.delete('/playlists/:id', (req, res) => {
 });
 
 // Add track to playlist
-router.post('/playlists/:id/tracks', (req, res) => {
+router.post('/playlists/:id/tracks', async (req, res) => {
   const { trackId } = req.body;
   if (!trackId) {
     return res.status(400).json({ error: 'trackId is required' });
   }
 
   try {
-    const updated = storage.addTrackToPlaylist(req.params.id, trackId);
+    const updated = await storage.addTrackToPlaylist(req.params.id, trackId);
     res.json({ success: true, playlist: updated });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -108,9 +110,9 @@ router.post('/playlists/:id/tracks', (req, res) => {
 });
 
 // Remove track from playlist
-router.delete('/playlists/:id/tracks/:trackId', (req, res) => {
+router.delete('/playlists/:id/tracks/:trackId', async (req, res) => {
   try {
-    const updated = storage.removeTrackFromPlaylist(req.params.id, req.params.trackId);
+    const updated = await storage.removeTrackFromPlaylist(req.params.id, req.params.trackId);
     res.json({ success: true, playlist: updated });
   } catch (err) {
     res.status(400).json({ error: err.message });

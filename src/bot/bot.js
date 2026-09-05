@@ -95,7 +95,7 @@ function initBot() {
     }
 
     const playlistId = targetPlaylist ? targetPlaylist.id : null;
-    const track = storage.addTrack(media, playlistId);
+    const track = await storage.addTrack(media, playlistId);
 
     console.log(`[Bot Media] Added "${track.title}" | Playlist: ${targetPlaylist ? targetPlaylist.name : 'Favorites'}`);
 
