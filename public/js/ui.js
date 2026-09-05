@@ -48,6 +48,8 @@ const UI = {
       btnNext: document.getElementById('btn-next'),
       btnRepeat: document.getElementById('btn-repeat'),
       btnSpeed: document.getElementById('btn-speed'),
+      btnQueue: document.getElementById('btn-queue'),
+      btnLike: document.getElementById('btn-like'),
       btnAddToPl: document.getElementById('btn-add-to-pl'),
 
       // Modals & Toast
@@ -152,6 +154,18 @@ const UI = {
       }
     });
 
+    if (this.dom.btnLike) {
+      this.dom.btnLike.addEventListener('click', () => {
+        this.toggleLikeCurrentTrack();
+      });
+    }
+
+    if (this.dom.btnQueue) {
+      this.dom.btnQueue.addEventListener('click', () => {
+        this.openQueueModal();
+      });
+    }
+
     // Seek Slider
     let isSeeking = false;
     this.dom.seekSlider.addEventListener('input', (e) => {
@@ -249,6 +263,11 @@ const UI = {
     document.querySelectorAll('.track-item').forEach((el) => {
       el.classList.toggle('playing', el.dataset.id === track.id);
     });
+
+    // Update Like button state
+    const favPl = (window.App.playlists || []).find((p) => p.id === 'pl_favorites');
+    const isLiked = favPl && Array.isArray(favPl.trackIds) && favPl.trackIds.includes(track.id);
+    this.updateLikeButton(isLiked);
   },
 
   onBuffering(isBuffering) {
@@ -298,6 +317,73 @@ const UI = {
       this.dom.btnRepeat.classList.add('active');
       this.showToast('تکرار ترک فعلی');
     }
+  },
+
+  async toggleLikeCurrentTrack() {
+    const track = window.AudioEngine.getCurrentTrack();
+    if (!track) return;
+
+    window.TelegramBridge.haptic.impact('medium');
+
+    const favPl = (window.App.playlists || []).find((p) => p.id === 'pl_favorites');
+    const isLiked = favPl && Array.isArray(favPl.trackIds) && favPl.trackIds.includes(track.id);
+
+    try {
+      if (isLiked) {
+        favPl.trackIds = favPl.trackIds.filter((id) => id !== track.id);
+        this.updateLikeButton(false);
+        this.showToast('از علاقه‌مندی‌ها حذف شد');
+        await window.ApiClient.removeTrackFromPlaylist('pl_favorites', track.id);
+      } else {
+        if (favPl) {
+          if (!Array.isArray(favPl.trackIds)) favPl.trackIds = [];
+          if (!favPl.trackIds.includes(track.id)) favPl.trackIds.push(track.id);
+        }
+        this.updateLikeButton(true);
+        this.showToast('به علاقه‌مندی‌ها اضافه شد ❤️');
+        await window.ApiClient.addTrackToPlaylist('pl_favorites', track.id);
+      }
+    } catch (err) {
+      console.error('Like toggle error:', err);
+    }
+  },
+
+  updateLikeButton(isLiked) {
+    if (!this.dom.btnLike) return;
+    this.dom.btnLike.classList.toggle('liked', !!isLiked);
+    this.dom.btnLike.innerHTML = isLiked ? Icons.heart : Icons.heartOutline;
+  },
+
+  openQueueModal() {
+    const queue = window.AudioEngine.queue || [];
+    const currentIdx = window.AudioEngine.currentIndex;
+
+    if (queue.length === 0) {
+      this.showToast('صف پخش خالی است');
+      return;
+    }
+
+    let listHtml = '<div class="queue-list" style="max-height: 55vh; overflow-y: auto; padding-top: 4px;">';
+    queue.forEach((t, idx) => {
+      const isCurrent = idx === currentIdx;
+      listHtml += `
+        <div class="track-item ${isCurrent ? 'playing' : ''}" onclick="window.AudioEngine.currentIndex = ${idx}; window.AudioEngine.loadCurrentTrack(true); window.UI.closeModal();" style="cursor: pointer; padding: 10px 12px; border-radius: 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px; background: ${isCurrent ? 'var(--secondary-bg-color)' : 'transparent'};">
+          <div style="font-size: 13px; font-weight: 700; color: ${isCurrent ? 'var(--button-color)' : 'var(--hint-color)'}; width: 22px; text-align: center;">
+            ${isCurrent ? '▶' : idx + 1}
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHTML(t.title)}</div>
+            <div style="font-size: 12px; color: var(--hint-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHTML(t.performer)}</div>
+          </div>
+          <div style="font-size: 12px; color: var(--hint-color); font-variant-numeric: tabular-nums;">
+            ${this.formatTime(t.duration || 0)}
+          </div>
+        </div>
+      `;
+    });
+    listHtml += '</div>';
+
+    this.showModal('صف پخش در حال اجرا', listHtml, []);
   },
 
   // Render Track List
