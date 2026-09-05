@@ -160,7 +160,7 @@ router.delete('/playlists/:id/tracks/:trackId', async (req, res) => {
 // In-memory cache for direct CDN links to eliminate Telegram API lookup latency
 const streamLinkCache = new Map();
 
-function streamAudioFromUrl(targetUrlStr, reqHeaders, res, maxRedirects = 3) {
+function streamAudioFromUrl(targetUrlStr, reqHeaders, res, maxRedirects = 3, onStatus = null) {
   if (maxRedirects <= 0) {
     if (!res.headersSent) res.status(502).json({ error: 'Too many redirects from Telegram' });
     return;
@@ -186,7 +186,12 @@ function streamAudioFromUrl(targetUrlStr, reqHeaders, res, maxRedirects = 3) {
       (proxyRes) => {
         // Follow redirect internally if any
         if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
-          return streamAudioFromUrl(proxyRes.headers.location, reqHeaders, res, maxRedirects - 1);
+          return streamAudioFromUrl(proxyRes.headers.location, reqHeaders, res, maxRedirects - 1, onStatus);
+        }
+
+        // Notify caller if Telegram returned an error status (e.g. 404 expired link)
+        if (onStatus && proxyRes.statusCode >= 400) {
+          return onStatus(proxyRes.statusCode);
         }
 
         // If upstream handled Range (206) or client didn't request Range
@@ -256,12 +261,16 @@ function streamAudioFromUrl(targetUrlStr, reqHeaders, res, maxRedirects = 3) {
           return;
         }
 
-        // Fallback for any other case
-        res.writeHead(200, {
+        // Fallback for any other case (always send Content-Length for progress calculation)
+        const fallbackHeaders = {
           'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg',
           'Accept-Ranges': 'bytes',
           'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable'
-        });
+        };
+        if (proxyRes.headers['content-length']) {
+          fallbackHeaders['Content-Length'] = proxyRes.headers['content-length'];
+        }
+        res.writeHead(200, fallbackHeaders);
         proxyRes.pipe(res);
       }
     );
@@ -292,8 +301,19 @@ router.get('/stream/:fileId', async (req, res) => {
     return res.status(503).json({ error: 'Telegram Bot is not initialized' });
   }
 
+  // Pre-check if track is known and exceeds Telegram's 20MB bot limit
+  const track = storage.getTrackByFileId(fileId);
+  if (track && track.fileSize > 20 * 1024 * 1024) {
+    return res.status(413).json({
+      error: 'File Too Large',
+      message: 'حجم این فایل بیشتر از ۲۰ مگابایت است (محدودیت وب تلگرام). لطفاً از دکمه «پخش در تلگرام» استفاده کنید.'
+    });
+  }
+
   try {
     let href = streamLinkCache.get(fileId);
+    let fromCache = !!href;
+
     if (!href) {
       const fileLink = await bot.telegram.getFileLink(fileId);
       href = fileLink.href;
@@ -301,11 +321,40 @@ router.get('/stream/:fileId', async (req, res) => {
       setTimeout(() => streamLinkCache.delete(fileId), 50 * 60 * 1000);
     }
 
-    streamAudioFromUrl(href, req.headers, res);
+    streamAudioFromUrl(href, req.headers, res, 3, async (statusCode) => {
+      // If Telegram returned an error status (like 404 expired link) and we used cache, retry with fresh link!
+      if (fromCache) {
+        console.warn(`[Stream] Cached link for ${fileId} failed (${statusCode}), retrying fresh link...`);
+        streamLinkCache.delete(fileId);
+        try {
+          const freshLink = await bot.telegram.getFileLink(fileId);
+          streamLinkCache.set(fileId, freshLink.href);
+          setTimeout(() => streamLinkCache.delete(fileId), 50 * 60 * 1000);
+          return streamAudioFromUrl(freshLink.href, req.headers, res, 3);
+        } catch (freshErr) {
+          console.error('[Stream Fresh Retry Failed]', freshErr.message);
+        }
+      }
+
+      if (!res.headersSent) {
+        res.status(statusCode).json({ error: 'Audio file stream error', status: statusCode });
+      }
+    });
   } catch (err) {
     console.error('[Stream Error]', err.message);
+    streamLinkCache.delete(fileId);
     if (!res.headersSent) {
-      res.status(404).json({ error: 'Audio file not found or expired on Telegram server' });
+      if (err.message && (err.message.includes('file is too big') || err.message.includes('400'))) {
+        return res.status(413).json({
+          error: 'File Too Large',
+          message: 'حجم این فایل بیشتر از ۲۰ مگابایت است (محدودیت دانلود وب تلگرام). لطفاً از دکمه «پخش در تلگرام» استفاده کنید.'
+        });
+      }
+      res.status(404).json({
+        error: 'Audio file not found or expired on Telegram server',
+        message: 'فایل در سرور تلگرام یافت نشد یا منقضی شده است. می‌توانید از دکمه «پخش در تلگرام» استفاده کنید.',
+        details: err.message
+      });
     }
   }
 });

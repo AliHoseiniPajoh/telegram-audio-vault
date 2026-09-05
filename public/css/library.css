@@ -192,6 +192,11 @@
 
 .track-action-btn.download-btn.downloading {
   color: var(--button-color, #2ea6ff);
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .track-action-btn.play-native {

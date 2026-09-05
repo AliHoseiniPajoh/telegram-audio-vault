@@ -185,6 +185,10 @@ class Storage {
     return (this.data.tracks || []).find((t) => t.id === id) || null;
   }
 
+  getTrackByFileId(fileId) {
+    return (this.data.tracks || []).find((t) => t.fileId === fileId) || null;
+  }
+
   getTrackByFileUniqueId(fileUniqueId) {
     return (this.data.tracks || []).find((t) => t.fileUniqueId === fileUniqueId) || null;
   }

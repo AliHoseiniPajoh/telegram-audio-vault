@@ -103,17 +103,55 @@ const AudioCache = {
     return false;
   },
 
-  async downloadTrack(track) {
+  async downloadTrack(track, onProgress) {
     if (!track || !track.fileId) throw new Error('فایل نامعتبر است');
     const streamUrl = window.ApiClient.getStreamUrl(track.fileId);
 
     const res = await fetch(streamUrl);
-    if (!res.ok) throw new Error(`خطای دریافت (${res.status})`);
-    const blob = await res.blob();
-    if (!blob || blob.size < 1000) throw new Error('فایل صوتی نامعتبر دریافت شد');
+    if (!res.ok) {
+      let errMsg = `خطای دریافت (${res.status})`;
+      try {
+        const errJson = await res.json();
+        if (errJson.message) errMsg = errJson.message;
+        else if (errJson.error) errMsg = errJson.error;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
+
+    const contentLength = res.headers.get('content-length');
+    const total = contentLength ? parseInt(contentLength, 10) : (track.fileSize || 0);
+
+    if (!res.body || !res.body.getReader) {
+      const blob = await res.blob();
+      if (!blob || blob.size < 1000) throw new Error('فایل صوتی نامعتبر دریافت شد');
+      await this.put(track.fileId, blob);
+      this.requestPersistence().catch(() => {});
+      if (typeof onProgress === 'function') onProgress(100);
+      return blob;
+    }
+
+    const reader = res.body.getReader();
+    let receivedLength = 0;
+    const chunks = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      receivedLength += value.length;
+      if (total > 0 && typeof onProgress === 'function') {
+        const percent = Math.min(Math.round((receivedLength / total) * 100), 99);
+        onProgress(percent, receivedLength, total);
+      }
+    }
+
+    const mimeType = track.mimeType || 'audio/mpeg';
+    const blob = new Blob(chunks, { type: mimeType });
+    if (!blob || blob.size < 1000) throw new Error('فایل صوتی ناقص دانلود شد');
 
     await this.put(track.fileId, blob);
     this.requestPersistence().catch(() => {});
+    if (typeof onProgress === 'function') onProgress(100);
     return blob;
   }
 };

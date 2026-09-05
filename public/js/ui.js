@@ -192,28 +192,46 @@ const UI = {
 
         this.dom.btnDownloadExpanded.innerHTML = `
           ${Icons.spinner}
-          <span>در حال دانلود...</span>
+          <span>0%</span>
         `;
         window.TelegramBridge.haptic.impact('light');
-        this.showToast('در حال دانلود و ذخیره در حافظه گوشی...');
+
+        const listBtn = document.querySelector(`.download-btn[data-file-id="${track.fileId}"]`);
+        if (listBtn) {
+          listBtn.innerHTML = `<span style="font-size: 10px; font-weight: 800;">0%</span>`;
+          listBtn.classList.add('downloading');
+        }
 
         try {
-          await window.AudioCache.downloadTrack(track);
+          await window.AudioCache.downloadTrack(track, (percent) => {
+            this.dom.btnDownloadExpanded.innerHTML = `
+              ${Icons.spinner}
+              <span>${percent}%</span>
+            `;
+            if (listBtn) {
+              listBtn.innerHTML = `<span style="font-size: 10px; font-weight: 800;">${percent}%</span>`;
+            }
+          });
+
           this.downloadedFileIds.add(track.fileId);
           window.TelegramBridge.haptic.notification('success');
-          this.showToast('✅ در حافظه گوشی ذخیره شد! از این به بعد بدون اینترنت و فوری پخش می‌شود.');
+          this.showToast('✅ با موفقیت در حافظه گوشی ذخیره شد (پخش فوری و آفلاین)');
           this.updateExpandedDownloadBtn();
 
-          const listBtn = document.querySelector(`.download-btn[data-file-id="${track.fileId}"]`);
           if (listBtn) {
             listBtn.innerHTML = Icons.check;
+            listBtn.classList.remove('downloading');
             listBtn.classList.add('downloaded');
             listBtn.title = 'ذخیره شده در حافظه گوشی (پخش آفلاین)';
           }
         } catch (err) {
           this.updateExpandedDownloadBtn();
+          if (listBtn) {
+            listBtn.innerHTML = Icons.download;
+            listBtn.classList.remove('downloading');
+          }
           window.TelegramBridge.haptic.notification('error');
-          this.showToast('❌ خطا در دانلود: ' + (err.message || 'ناموفق'));
+          this.showToast('❌ ' + (err.message || 'خطا در دانلود'));
         }
       });
     }
@@ -590,26 +608,37 @@ const UI = {
         }
 
         // Start download
-        btn.innerHTML = Icons.spinner;
+        btn.innerHTML = `<span style="font-size: 10px; font-weight: 800;">0%</span>`;
         btn.classList.add('downloading');
         window.TelegramBridge.haptic.impact('light');
-        this.showToast('در حال دانلود و ذخیره در حافظه گوشی...');
 
         try {
-          await window.AudioCache.downloadTrack(track);
+          await window.AudioCache.downloadTrack(track, (percent) => {
+            btn.innerHTML = `<span style="font-size: 10px; font-weight: 800;">${percent}%</span>`;
+            if (this.dom.btnDownloadExpanded) {
+              const cur = window.AudioEngine.getCurrentTrack();
+              if (cur && cur.id === track.id) {
+                this.dom.btnDownloadExpanded.innerHTML = `
+                  ${Icons.spinner}
+                  <span>${percent}%</span>
+                `;
+              }
+            }
+          });
+
           this.downloadedFileIds.add(track.fileId);
           btn.innerHTML = Icons.check;
           btn.classList.remove('downloading');
           btn.classList.add('downloaded');
           btn.title = 'ذخیره شده در حافظه گوشی (پخش آفلاین)';
           window.TelegramBridge.haptic.notification('success');
-          this.showToast('✅ در حافظه گوشی ذخیره شد! از این به بعد بدون اینترنت و فوری پخش می‌شود.');
+          this.showToast('✅ با موفقیت در حافظه گوشی ذخیره شد (پخش فوری و آفلاین)');
           this.updateExpandedDownloadBtn();
         } catch (err) {
           btn.innerHTML = Icons.download;
           btn.classList.remove('downloading');
           window.TelegramBridge.haptic.notification('error');
-          this.showToast('❌ خطا در دانلود: ' + (err.message || 'ناموفق'));
+          this.showToast('❌ ' + (err.message || 'خطا در دانلود'));
         }
       });
     });
@@ -798,24 +827,36 @@ const UI = {
             this.confirmRemoveDownload(track);
             return;
           }
-          btn.innerHTML = Icons.spinner;
+          btn.innerHTML = `<span style="font-size: 10px; font-weight: 800;">0%</span>`;
           btn.classList.add('downloading');
           window.TelegramBridge.haptic.impact('light');
-          this.showToast('در حال دانلود و ذخیره در حافظه گوشی...');
+
           try {
-            await window.AudioCache.downloadTrack(track);
+            await window.AudioCache.downloadTrack(track, (percent) => {
+              btn.innerHTML = `<span style="font-size: 10px; font-weight: 800;">${percent}%</span>`;
+              if (this.dom.btnDownloadExpanded) {
+                const cur = window.AudioEngine.getCurrentTrack();
+                if (cur && cur.id === track.id) {
+                  this.dom.btnDownloadExpanded.innerHTML = `
+                    ${Icons.spinner}
+                    <span>${percent}%</span>
+                  `;
+                }
+              }
+            });
+
             this.downloadedFileIds.add(track.fileId);
             btn.innerHTML = Icons.check;
             btn.classList.remove('downloading');
             btn.classList.add('downloaded');
             window.TelegramBridge.haptic.notification('success');
-            this.showToast('✅ در حافظه گوشی ذخیره شد! از این به بعد بدون اینترنت و فوری پخش می‌شود.');
+            this.showToast('✅ با موفقیت در حافظه گوشی ذخیره شد (پخش فوری و آفلاین)');
             this.updateExpandedDownloadBtn();
           } catch (err) {
             btn.innerHTML = Icons.download;
             btn.classList.remove('downloading');
             window.TelegramBridge.haptic.notification('error');
-            this.showToast('❌ خطا در دانلود: ' + (err.message || 'ناموفق'));
+            this.showToast('❌ ' + (err.message || 'خطا در دانلود'));
           }
         });
       });
