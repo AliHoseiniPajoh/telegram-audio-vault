@@ -127,11 +127,28 @@ class Storage {
     return this.data.tracks.find((t) => t.fileUniqueId === fileUniqueId) || null;
   }
 
-  addTrack(metadata) {
+  getOrCreatePlaylistByName(name) {
+    if (!name || typeof name !== 'string') return this.data.playlists[0] || null;
+    const cleanName = name.trim();
+    const existing = this.data.playlists.find(
+      (p) => p.name.toLowerCase() === cleanName.toLowerCase()
+    );
+    if (existing) return existing;
+    return this.createPlaylist(cleanName);
+  }
+
+  addTrack(metadata, playlistId = null) {
     const existing = this.getTrackByFileUniqueId(metadata.fileUniqueId);
     if (existing) {
       existing.fileId = metadata.fileId;
       existing.updatedAt = new Date().toISOString();
+      // Ensure it is in target playlist if specified
+      if (playlistId) {
+        const pl = this.data.playlists.find((p) => p.id === playlistId);
+        if (pl && !pl.trackIds.includes(existing.id)) {
+          pl.trackIds.push(existing.id);
+        }
+      }
       this.save();
       return existing;
     }
@@ -151,6 +168,20 @@ class Storage {
     };
 
     this.data.tracks.push(newTrack);
+
+    // Auto-add to target playlist OR default Favorites playlist
+    if (playlistId) {
+      const pl = this.data.playlists.find((p) => p.id === playlistId);
+      if (pl && !pl.trackIds.includes(newTrack.id)) {
+        pl.trackIds.push(newTrack.id);
+      }
+    } else if (this.data.playlists.length > 0) {
+      const defaultPl = this.data.playlists[0];
+      if (!defaultPl.trackIds.includes(newTrack.id)) {
+        defaultPl.trackIds.push(newTrack.id);
+      }
+    }
+
     this.save();
     return newTrack;
   }
