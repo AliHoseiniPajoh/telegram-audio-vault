@@ -101,18 +101,44 @@ function initBot() {
 
     // If in private chat, send confirmation response
     if (ctx.chat?.type === 'private') {
-      const plNotice = targetPlaylist ? `\n📂 اضافه شد به پلی‌لیست: *${escapeMarkdown(targetPlaylist.name)}*` : '\n📂 اضافه شد به: *Favorites*';
-      await ctx.reply(
-        `✅ ترَک صوتی با موفقیت ذخیره شد:\n🎵 *${escapeMarkdown(track.title)}*\n👤 ${escapeMarkdown(track.performer)}${plNotice}`,
-        {
-          parse_mode: 'Markdown',
+      const plName = targetPlaylist ? targetPlaylist.name : 'Favorites';
+      const replyText = 
+`✅ <b>موزیک دریافت شد و به کتابخانه اضافه شد.</b>
+
+🎵 <b>عنوان:</b> ${escapeHtml(track.title)}
+👤 <b>هنرمند:</b> ${escapeHtml(track.performer)}
+📂 <b>پلی‌لیست:</b> ${escapeHtml(plName)}`;
+
+      try {
+        await ctx.reply(replyText, {
+          parse_mode: 'HTML',
           reply_markup: {
             inline_keyboard: [
               [{ text: '▶️ باز کردن در مینی‌اپ', web_app: { url: config.webAppUrl } }]
             ]
           }
-        }
-      );
+        });
+      } catch (err) {
+        console.error('[Bot Reply Error]', err.message);
+        // Plain text fallback
+        await ctx.reply(`✅ موزیک دریافت شد و به کتابخانه اضافه شد:\n${track.title}`);
+      }
+    } else if (ctx.chat?.type === 'channel' && config.allowedUserId) {
+      // In channel post, notify owner privately in their bot chat
+      try {
+        await ctx.telegram.sendMessage(
+          config.allowedUserId,
+          `📥 <b>موزیک جدید از کانال دریافت شد و به کتابخانه اضافه شد.</b>\n\n📢 <b>کانال:</b> ${escapeHtml(sourceChannelTitle || 'کانال')}\n🎵 <b>عنوان:</b> ${escapeHtml(track.title)}\n👤 <b>هنرمند:</b> ${escapeHtml(track.performer)}`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '▶️ باز کردن در مینی‌اپ', web_app: { url: config.webAppUrl } }]
+              ]
+            }
+          }
+        );
+      } catch (_) {}
     }
 
     return true;
@@ -121,7 +147,19 @@ function initBot() {
   // 1. Private Chat: audio, voice, document
   bot.on('message', async (ctx) => {
     if (!ctx.message) return;
-    await processIncomingMedia(ctx, ctx.message);
+    const handled = await processIncomingMedia(ctx, ctx.message);
+    if (!handled && ctx.chat?.type === 'private' && !ctx.message.text?.startsWith('/')) {
+      await ctx.reply(
+        '💡 برای افزودن موزیک به کتابخانه، لطفاً یک فایل صوتی (MP3, M4A, FLAC, ...) یا وویس ارسال یا فوروارد کنید.',
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🎵 باز کردن مینی‌اپ', web_app: { url: config.webAppUrl } }]
+            ]
+          }
+        }
+      );
+    }
   });
 
   // 2. Channel Posts: automatically capture new music posted in the channel
@@ -196,6 +234,13 @@ function extractAudioMetadata(msg) {
   }
 
   return null;
+}
+
+function escapeHtml(text = '') {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function escapeMarkdown(text = '') {
