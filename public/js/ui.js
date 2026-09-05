@@ -7,11 +7,22 @@ const UI = {
   currentTab: 'tracks', // 'tracks' | 'playlists'
   activePlaylistId: null,
   isExpandedOpen: false,
+  downloadedFileIds: new Set(),
 
   // Initialize UI references and event hooks
   init() {
     this.bindDOM();
     this.bindEvents();
+    this.syncDownloadedTracks();
+  },
+
+  async syncDownloadedTracks() {
+    if (window.AudioCache && window.AudioCache.getAllKeys) {
+      try {
+        const keys = await window.AudioCache.getAllKeys();
+        this.downloadedFileIds = new Set(keys);
+      } catch (_) {}
+    }
   },
 
   bindDOM() {
@@ -50,6 +61,7 @@ const UI = {
       btnSpeed: document.getElementById('btn-speed'),
       btnQueue: document.getElementById('btn-queue'),
       btnLike: document.getElementById('btn-like'),
+      btnDownloadExpanded: document.getElementById('btn-download-expanded'),
       btnPlayNative: document.getElementById('btn-play-native'),
       btnAddToPl: document.getElementById('btn-add-to-pl'),
 
@@ -164,6 +176,45 @@ const UI = {
     if (this.dom.btnQueue) {
       this.dom.btnQueue.addEventListener('click', () => {
         this.openQueueModal();
+      });
+    }
+
+    if (this.dom.btnDownloadExpanded) {
+      this.dom.btnDownloadExpanded.addEventListener('click', async () => {
+        const track = window.AudioEngine.getCurrentTrack();
+        if (!track) return;
+
+        const isDownloaded = this.downloadedFileIds.has(track.fileId);
+        if (isDownloaded) {
+          this.confirmRemoveDownload(track);
+          return;
+        }
+
+        this.dom.btnDownloadExpanded.innerHTML = `
+          ${Icons.spinner}
+          <span>در حال دانلود...</span>
+        `;
+        window.TelegramBridge.haptic.impact('light');
+        this.showToast('در حال دانلود و ذخیره در حافظه گوشی...');
+
+        try {
+          await window.AudioCache.downloadTrack(track);
+          this.downloadedFileIds.add(track.fileId);
+          window.TelegramBridge.haptic.notification('success');
+          this.showToast('✅ در حافظه گوشی ذخیره شد! از این به بعد بدون اینترنت و فوری پخش می‌شود.');
+          this.updateExpandedDownloadBtn();
+
+          const listBtn = document.querySelector(`.download-btn[data-file-id="${track.fileId}"]`);
+          if (listBtn) {
+            listBtn.innerHTML = Icons.check;
+            listBtn.classList.add('downloaded');
+            listBtn.title = 'ذخیره شده در حافظه گوشی (پخش آفلاین)';
+          }
+        } catch (err) {
+          this.updateExpandedDownloadBtn();
+          window.TelegramBridge.haptic.notification('error');
+          this.showToast('❌ خطا در دانلود: ' + (err.message || 'ناموفق'));
+        }
       });
     }
 
@@ -284,6 +335,9 @@ const UI = {
     const favPl = (window.App.playlists || []).find((p) => p.id === 'pl_favorites');
     const isLiked = favPl && Array.isArray(favPl.trackIds) && favPl.trackIds.includes(track.id);
     this.updateLikeButton(isLiked);
+
+    // Update Download button state in expanded player
+    this.updateExpandedDownloadBtn();
   },
 
   onBuffering(isBuffering) {
@@ -370,6 +424,60 @@ const UI = {
     this.dom.btnLike.innerHTML = isLiked ? Icons.heart : Icons.heartOutline;
   },
 
+  updateExpandedDownloadBtn() {
+    if (!this.dom.btnDownloadExpanded) return;
+    const currentTrack = window.AudioEngine.getCurrentTrack();
+    if (!currentTrack) return;
+
+    const isDownloaded = this.downloadedFileIds.has(currentTrack.fileId);
+    if (isDownloaded) {
+      this.dom.btnDownloadExpanded.classList.add('downloaded');
+      this.dom.btnDownloadExpanded.innerHTML = `
+        ${Icons.check}
+        <span>دانلود شده</span>
+      `;
+      this.dom.btnDownloadExpanded.title = 'ذخیره در حافظه گوشی (برای مدیریت کلیک کنید)';
+    } else {
+      this.dom.btnDownloadExpanded.classList.remove('downloaded');
+      this.dom.btnDownloadExpanded.innerHTML = `
+        ${Icons.download}
+        <span>دانلود آفلاین</span>
+      `;
+      this.dom.btnDownloadExpanded.title = 'دانلود و ذخیره دائمی در حافظه گوشی';
+    }
+  },
+
+  confirmRemoveDownload(track) {
+    this.openModal(
+      'مدیریت حافظه آفلاین',
+      `<p style="font-size: 14px; line-height: 1.6; color: var(--text-color); text-align: center;">
+        فایل <b>«${this.escapeHTML(track.title)}»</b> در حافظه داخلی گوشی شما ذخیره است.<br/>
+        آیا می‌خواهید این فایل را از حافظه آفلاین گوشی پاک کنید؟
+      </p>`,
+      `
+        <button class="btn btn-secondary" id="modal-cancel">انصراف</button>
+        <button class="btn btn-danger" id="modal-confirm-delete-dl">حذف فایل آفلاین</button>
+      `
+    );
+
+    document.getElementById('modal-cancel').addEventListener('click', () => this.closeModal());
+    document.getElementById('modal-confirm-delete-dl').addEventListener('click', async () => {
+      await window.AudioCache.delete(track.fileId);
+      this.downloadedFileIds.delete(track.fileId);
+      this.closeModal();
+      window.TelegramBridge.haptic.notification('success');
+      this.showToast('فایل از حافظه آفلاین گوشی حذف شد.');
+
+      const listBtn = document.querySelector(`.download-btn[data-file-id="${track.fileId}"]`);
+      if (listBtn) {
+        listBtn.innerHTML = Icons.download;
+        listBtn.classList.remove('downloaded');
+        listBtn.title = 'دانلود و ذخیره دائمی در گوشی';
+      }
+      this.updateExpandedDownloadBtn();
+    });
+  },
+
   openQueueModal() {
     const queue = window.AudioEngine.queue || [];
     const currentIdx = window.AudioEngine.currentIndex;
@@ -421,6 +529,10 @@ const UI = {
       const isPlayingThis = currentTrack && currentTrack.id === track.id;
       const durationStr = this.formatTime(track.duration);
       const icon = track.type === 'voice' ? Icons.mic : Icons.musicNote;
+      const isDownloaded = this.downloadedFileIds.has(track.fileId);
+      const dlIcon = isDownloaded ? Icons.check : Icons.download;
+      const dlClass = isDownloaded ? 'downloaded' : '';
+      const dlTitle = isDownloaded ? 'ذخیره شده در حافظه گوشی (پخش آفلاین)' : 'دانلود و ذخیره دائمی در حافظه گوشی';
 
       return `
         <div class="track-item ${isPlayingThis ? 'playing' : ''}" data-id="${track.id}" data-index="${idx}">
@@ -434,6 +546,9 @@ const UI = {
             </div>
           </div>
           <div class="track-actions">
+            <button class="track-action-btn download-btn ${dlClass}" data-id="${track.id}" data-file-id="${track.fileId}" title="${dlTitle}">
+              ${dlIcon}
+            </button>
             <button class="track-action-btn play-native" data-id="${track.id}" title="ارسال به چت تلگرام (پخش فوری در پلیر تلگرام بدون دانلود)">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
             </button>
@@ -457,6 +572,45 @@ const UI = {
         const index = parseInt(item.dataset.index, 10);
         window.TelegramBridge.haptic.impact('light');
         window.AudioEngine.setQueue(tracks, index, true);
+      });
+    });
+
+    // Bind Download to Phone Storage
+    this.dom.contentView.querySelectorAll('.download-btn').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const trackId = btn.dataset.id;
+        const track = tracks.find((t) => t.id === trackId);
+        if (!track) return;
+
+        const isDownloaded = this.downloadedFileIds.has(track.fileId);
+        if (isDownloaded) {
+          this.confirmRemoveDownload(track);
+          return;
+        }
+
+        // Start download
+        btn.innerHTML = Icons.spinner;
+        btn.classList.add('downloading');
+        window.TelegramBridge.haptic.impact('light');
+        this.showToast('در حال دانلود و ذخیره در حافظه گوشی...');
+
+        try {
+          await window.AudioCache.downloadTrack(track);
+          this.downloadedFileIds.add(track.fileId);
+          btn.innerHTML = Icons.check;
+          btn.classList.remove('downloading');
+          btn.classList.add('downloaded');
+          btn.title = 'ذخیره شده در حافظه گوشی (پخش آفلاین)';
+          window.TelegramBridge.haptic.notification('success');
+          this.showToast('✅ در حافظه گوشی ذخیره شد! از این به بعد بدون اینترنت و فوری پخش می‌شود.');
+          this.updateExpandedDownloadBtn();
+        } catch (err) {
+          btn.innerHTML = Icons.download;
+          btn.classList.remove('downloading');
+          window.TelegramBridge.haptic.notification('error');
+          this.showToast('❌ خطا در دانلود: ' + (err.message || 'ناموفق'));
+        }
       });
     });
 
@@ -590,24 +744,37 @@ const UI = {
         </div>
       `;
     } else {
-      const html = playlist.tracks.map((track, idx) => `
-        <div class="track-item" data-id="${track.id}" data-index="${idx}">
-          <div class="track-artwork-badge">${track.type === 'voice' ? Icons.mic : Icons.musicNote}</div>
-          <div class="track-details">
-            <div class="track-name">${this.escapeHTML(track.title)}</div>
-            <div class="track-sub">
-              <span>${this.escapeHTML(track.performer)}</span>
-              <span>•</span>
-              <span>${this.formatTime(track.duration)}</span>
+      const html = playlist.tracks.map((track, idx) => {
+        const isDownloaded = this.downloadedFileIds.has(track.fileId);
+        const dlIcon = isDownloaded ? Icons.check : Icons.download;
+        const dlClass = isDownloaded ? 'downloaded' : '';
+        const dlTitle = isDownloaded ? 'ذخیره شده در حافظه گوشی (پخش آفلاین)' : 'دانلود و ذخیره دائمی در حافظه گوشی';
+
+        return `
+          <div class="track-item" data-id="${track.id}" data-index="${idx}">
+            <div class="track-artwork-badge">${track.type === 'voice' ? Icons.mic : Icons.musicNote}</div>
+            <div class="track-details">
+              <div class="track-name">${this.escapeHTML(track.title)}</div>
+              <div class="track-sub">
+                <span>${this.escapeHTML(track.performer)}</span>
+                <span>•</span>
+                <span>${this.formatTime(track.duration)}</span>
+              </div>
+            </div>
+            <div class="track-actions">
+              <button class="track-action-btn download-btn ${dlClass}" data-id="${track.id}" data-file-id="${track.fileId}" title="${dlTitle}">
+                ${dlIcon}
+              </button>
+              <button class="track-action-btn play-native" data-id="${track.id}" title="ارسال به چت تلگرام (پخش فوری در پلیر تلگرام بدون دانلود)">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              </button>
+              <button class="track-action-btn pl-remove-track" data-track-id="${track.id}" title="حذف از پلی‌لیست">
+                ${Icons.close}
+              </button>
             </div>
           </div>
-          <div class="track-actions">
-            <button class="track-action-btn pl-remove-track" data-track-id="${track.id}" title="حذف از پلی‌لیست">
-              ${Icons.close}
-            </button>
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       tracksContainer.innerHTML = html;
 
@@ -618,6 +785,53 @@ const UI = {
           const index = parseInt(item.dataset.index, 10);
           window.TelegramBridge.haptic.impact('light');
           window.AudioEngine.setQueue(playlist.tracks, index, true);
+        });
+      });
+
+      // Bind Download
+      tracksContainer.querySelectorAll('.download-btn').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const track = playlist.tracks.find((t) => t.id === btn.dataset.id);
+          if (!track) return;
+          if (this.downloadedFileIds.has(track.fileId)) {
+            this.confirmRemoveDownload(track);
+            return;
+          }
+          btn.innerHTML = Icons.spinner;
+          btn.classList.add('downloading');
+          window.TelegramBridge.haptic.impact('light');
+          this.showToast('در حال دانلود و ذخیره در حافظه گوشی...');
+          try {
+            await window.AudioCache.downloadTrack(track);
+            this.downloadedFileIds.add(track.fileId);
+            btn.innerHTML = Icons.check;
+            btn.classList.remove('downloading');
+            btn.classList.add('downloaded');
+            window.TelegramBridge.haptic.notification('success');
+            this.showToast('✅ در حافظه گوشی ذخیره شد! از این به بعد بدون اینترنت و فوری پخش می‌شود.');
+            this.updateExpandedDownloadBtn();
+          } catch (err) {
+            btn.innerHTML = Icons.download;
+            btn.classList.remove('downloading');
+            window.TelegramBridge.haptic.notification('error');
+            this.showToast('❌ خطا در دانلود: ' + (err.message || 'ناموفق'));
+          }
+        });
+      });
+
+      // Bind Play Native
+      tracksContainer.querySelectorAll('.play-native').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          window.TelegramBridge.haptic.impact('medium');
+          this.showToast('در حال ارسال به چت تلگرام...');
+          try {
+            await window.ApiClient.playNative(btn.dataset.id);
+            this.showToast('✅ فایل به تلگرام ارسال شد! بدون دانلود پلی کنید.');
+          } catch (err) {
+            this.showToast('❌ خطا در ارسال: ' + (err.message || 'ناموفق'));
+          }
         });
       });
 

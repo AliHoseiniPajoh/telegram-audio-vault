@@ -379,6 +379,12 @@
   background: var(--card-active);
 }
 
+.chip-btn.downloaded {
+  color: #31b545;
+  border-color: rgba(49, 181, 69, 0.4);
+  background: rgba(49, 181, 69, 0.12);
+}
+
 /* Buffering / Loading Spinner Animation */
 .icon-spin {
   animation: player-spin 0.9s linear infinite;

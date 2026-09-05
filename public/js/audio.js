@@ -56,8 +56,69 @@ const AudioCache = {
     } catch (_) {
       return false;
     }
+  },
+
+  async delete(fileId) {
+    try {
+      const db = await this.getDb();
+      if (!db) return false;
+      return new Promise((resolve) => {
+        const tx = db.transaction('audio_files', 'readwrite');
+        const store = tx.objectStore('audio_files');
+        store.delete(fileId);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch (_) {
+      return false;
+    }
+  },
+
+  async getAllKeys() {
+    try {
+      const db = await this.getDb();
+      if (!db) return [];
+      return new Promise((resolve) => {
+        const tx = db.transaction('audio_files', 'readonly');
+        const store = tx.objectStore('audio_files');
+        const req = store.getAllKeys();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
+    } catch (_) {
+      return [];
+    }
+  },
+
+  async requestPersistence() {
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+      try {
+        const isPersisted = await navigator.storage.persist();
+        console.log('[AudioCache] Persistent storage granted:', isPersisted);
+        return isPersisted;
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  },
+
+  async downloadTrack(track) {
+    if (!track || !track.fileId) throw new Error('فایل نامعتبر است');
+    const streamUrl = window.ApiClient.getStreamUrl(track.fileId);
+
+    const res = await fetch(streamUrl);
+    if (!res.ok) throw new Error(`خطای دریافت (${res.status})`);
+    const blob = await res.blob();
+    if (!blob || blob.size < 1000) throw new Error('فایل صوتی نامعتبر دریافت شد');
+
+    await this.put(track.fileId, blob);
+    this.requestPersistence().catch(() => {});
+    return blob;
   }
 };
+
+window.AudioCache = AudioCache;
 
 class AudioEngine {
   constructor() {

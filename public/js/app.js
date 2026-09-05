@@ -36,6 +36,9 @@ const App = {
 
   async loadTracks(query = '') {
     try {
+      if (window.UI?.syncDownloadedTracks) {
+        await window.UI.syncDownloadedTracks();
+      }
       this.tracks = await window.ApiClient.getTracks(query);
       window.UI.renderTracks(this.tracks);
     } catch (err) {

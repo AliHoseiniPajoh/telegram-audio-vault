@@ -170,6 +170,30 @@
   color: var(--text-color);
 }
 
+.track-action-btn.download-btn {
+  color: var(--hint-color);
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.track-action-btn.download-btn:hover,
+.track-action-btn.download-btn:active {
+  color: var(--text-color);
+}
+
+.track-action-btn.download-btn.downloaded {
+  color: #31b545;
+}
+
+.track-action-btn.download-btn.downloaded:hover,
+.track-action-btn.download-btn.downloaded:active {
+  background: rgba(49, 181, 69, 0.12);
+  color: #31b545;
+}
+
+.track-action-btn.download-btn.downloading {
+  color: var(--button-color, #2ea6ff);
+}
+
 .track-action-btn.play-native {
   color: var(--button-color, #2ea6ff);
 }
