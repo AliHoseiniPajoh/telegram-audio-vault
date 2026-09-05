@@ -5,6 +5,24 @@ const { storage } = require('../db/storage');
 let bot = null;
 const verifiedChannelIds = new Set();
 
+/**
+ * Returns a guaranteed valid HTTPS WebApp URL for Telegram buttons
+ */
+function getValidWebAppUrl() {
+  let url = config.webAppUrl;
+  if (!url || !url.startsWith('https://')) {
+    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+      url = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+    } else if (process.env.VERCEL_URL) {
+      url = `https://${process.env.VERCEL_URL}`;
+    }
+  }
+  if (url && typeof url === 'string' && url.startsWith('https://')) {
+    return url.replace(/\/+$/, '');
+  }
+  return null;
+}
+
 function initBot() {
   if (!config.botToken) {
     console.warn('[Bot] Bot token is not set. Bot will not start until BOT_TOKEN is configured.');
@@ -17,9 +35,11 @@ function initBot() {
   bot.use(async (ctx, next) => {
     // 1. Private Chat Interactions
     if (ctx.chat?.type === 'private') {
-      const senderId = ctx.from ? String(ctx.from.id) : null;
-      if (!senderId || senderId !== config.allowedUserId) {
-        console.warn(`[Bot Security] Unauthorized interaction by user: ${senderId} (@${ctx.from?.username || 'no_user'})`);
+      const senderId = ctx.from ? String(ctx.from.id).trim() : null;
+      const allowedId = config.allowedUserId ? String(config.allowedUserId).trim() : null;
+
+      if (allowedId && senderId !== allowedId) {
+        console.warn(`[Bot Security] Blocked user: ${senderId} (Expected: ${allowedId})`);
         try {
           await ctx.reply('⛔ دسترسی غیرمجاز: این ربات کاملاً شخصی و خصوصی است.');
         } catch (_) {}
@@ -32,27 +52,23 @@ function initBot() {
     if (ctx.chat?.type === 'channel') {
       const chatId = ctx.chat.id;
 
-      // Check cache first
       if (verifiedChannelIds.has(chatId)) {
         return next();
       }
 
-      // Verify that the owner is an administrator of this channel
       try {
         const admins = await ctx.telegram.getChatAdministrators(chatId);
-        const isOwnerAdmin = admins.some((admin) => String(admin.user.id) === config.allowedUserId);
+        const isOwnerAdmin = admins.some((admin) => String(admin.user.id).trim() === String(config.allowedUserId).trim());
 
         if (isOwnerAdmin) {
           verifiedChannelIds.add(chatId);
-          console.log(`[Bot Security] Verified channel "${ctx.chat.title}" (${chatId}) for owner.`);
+          console.log(`[Bot Security] Verified channel "${ctx.chat.title}" for owner.`);
           return next();
         } else {
           console.warn(`[Bot Security] Channel ${chatId} ignored: Owner is not an admin.`);
           return;
         }
       } catch (err) {
-        console.warn(`[Bot Security] Could not verify channel admins for ${chatId}:`, err.message);
-        // If Telegram restrictions prevent listing admins, accept if bot was added as admin
         verifiedChannelIds.add(chatId);
         return next();
       }
@@ -61,22 +77,27 @@ function initBot() {
     return next();
   });
 
-  // /start command in private chat
+  // /start command: Immediate friendly welcome message with Mini App button
   bot.command('start', async (ctx) => {
+    const webAppUrl = getValidWebAppUrl();
     const welcomeText = 
-`🎧 *صندوقچه صوتی شخصی شما آماده است!*
+`🎧 سلام! به صندوقچه صوتی شخصی خوش آمدید.
 
-برای افزودن ترَک، هر فایل صوتی (MP3, M4A, FLAC) یا پیام صوتی (Voice) را به این چت بفرستید یا فوروارد کنید.
+برای افزودن هر فایل یا پیام صوتی، کافیست آن را به این چت بفرستید یا فوروارد کنید تا در کتابخانه شخصی شما ذخیره شود.
 
-*نکته کانال‌ها:*
-اگر این ربات را در کانال خود ادمین کنید، هر موزیکی که در کانال پست شود، به صورت خودکار به مینی‌اپ و پلی‌لیست اختصاصی آن کانال اضافه خواهد شد.`;
+همچنین با ارسال این ربات به کانال تلگرامی‌تان و ادمین کردن آن، موزیک‌های کانال نیز خودکار به مینی‌اپ اضافه می‌شوند.`;
 
-    await ctx.replyWithMarkdown(
-      welcomeText,
-      Markup.inlineKeyboard([
-        [Markup.button.webApp('🎵 باز کردن پلیر و کتابخانه', config.webAppUrl)]
-      ])
-    );
+    try {
+      const buttons = [];
+      if (webAppUrl) {
+        buttons.push([Markup.button.webApp('🎵 باز کردن صندوقچه صوتی', webAppUrl)]);
+      }
+
+      await ctx.reply(welcomeText, buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined);
+    } catch (err) {
+      console.error('[Start Error]', err.message);
+      await ctx.reply(welcomeText);
+    }
   });
 
   // Unified Media Processor for Audio, Voice, and Audio-Documents
@@ -97,46 +118,50 @@ function initBot() {
     const playlistId = targetPlaylist ? targetPlaylist.id : null;
     const track = await storage.addTrack(media, playlistId);
 
-    console.log(`[Bot Media] Added "${track.title}" | Playlist: ${targetPlaylist ? targetPlaylist.name : 'Favorites'}`);
+    console.log(`[Bot Media] Saved "${track.title}" | Playlist: ${targetPlaylist ? targetPlaylist.name : 'Favorites'}`);
 
     // If in private chat, send confirmation response
     if (ctx.chat?.type === 'private') {
       const plName = targetPlaylist ? targetPlaylist.name : 'Favorites';
+      const webAppUrl = getValidWebAppUrl();
       const replyText = 
-`✅ <b>موزیک دریافت شد و به کتابخانه اضافه شد.</b>
+`✅ موزیک دریافت شد و به کتابخانه اضافه شد.
 
-🎵 <b>عنوان:</b> ${escapeHtml(track.title)}
-👤 <b>هنرمند:</b> ${escapeHtml(track.performer)}
-📂 <b>پلی‌لیست:</b> ${escapeHtml(plName)}`;
+🎵 عنوان: ${track.title}
+👤 هنرمند: ${track.performer}
+📂 پلی‌لیست: ${plName}`;
 
       try {
-        await ctx.reply(replyText, {
-          parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '▶️ باز کردن در مینی‌اپ', web_app: { url: config.webAppUrl } }]
-            ]
-          }
-        });
+        const buttons = [];
+        if (webAppUrl) {
+          buttons.push([Markup.button.webApp('▶️ باز کردن در مینی‌اپ', webAppUrl)]);
+        }
+
+        await ctx.reply(replyText, buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined);
       } catch (err) {
-        console.error('[Bot Reply Error]', err.message);
-        // Plain text fallback
-        await ctx.reply(`✅ موزیک دریافت شد و به کتابخانه اضافه شد:\n${track.title}`);
+        console.error('[Reply Error]', err.message);
+        await ctx.reply(replyText);
       }
     } else if (ctx.chat?.type === 'channel' && config.allowedUserId) {
       // In channel post, notify owner privately in their bot chat
       try {
+        const webAppUrl = getValidWebAppUrl();
+        const notifyText = 
+`📥 موزیک جدید از کانال دریافت شد و به کتابخانه اضافه شد.
+
+📢 کانال: ${sourceChannelTitle || 'کانال'}
+🎵 عنوان: ${track.title}
+👤 هنرمند: ${track.performer}`;
+
+        const buttons = [];
+        if (webAppUrl) {
+          buttons.push([Markup.button.webApp('▶️ باز کردن در مینی‌اپ', webAppUrl)]);
+        }
+
         await ctx.telegram.sendMessage(
           config.allowedUserId,
-          `📥 <b>موزیک جدید از کانال دریافت شد و به کتابخانه اضافه شد.</b>\n\n📢 <b>کانال:</b> ${escapeHtml(sourceChannelTitle || 'کانال')}\n🎵 <b>عنوان:</b> ${escapeHtml(track.title)}\n👤 <b>هنرمند:</b> ${escapeHtml(track.performer)}`,
-          {
-            parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: '▶️ باز کردن در مینی‌اپ', web_app: { url: config.webAppUrl } }]
-              ]
-            }
-          }
+          notifyText,
+          buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined
         );
       } catch (_) {}
     }
@@ -144,20 +169,20 @@ function initBot() {
     return true;
   }
 
-  // 1. Private Chat: audio, voice, document
+  // 1. Private Chat: audio, voice, document, or text
   bot.on('message', async (ctx) => {
     if (!ctx.message) return;
     const handled = await processIncomingMedia(ctx, ctx.message);
     if (!handled && ctx.chat?.type === 'private' && !ctx.message.text?.startsWith('/')) {
+      const webAppUrl = getValidWebAppUrl();
+      const buttons = [];
+      if (webAppUrl) {
+        buttons.push([Markup.button.webApp('🎵 باز کردن مینی‌اپ', webAppUrl)]);
+      }
+
       await ctx.reply(
         '💡 برای افزودن موزیک به کتابخانه، لطفاً یک فایل صوتی (MP3, M4A, FLAC, ...) یا وویس ارسال یا فوروارد کنید.',
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '🎵 باز کردن مینی‌اپ', web_app: { url: config.webAppUrl } }]
-            ]
-          }
-        }
+        buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined
       );
     }
   });
@@ -234,17 +259,6 @@ function extractAudioMetadata(msg) {
   }
 
   return null;
-}
-
-function escapeHtml(text = '') {
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function escapeMarkdown(text = '') {
-  return String(text).replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
 }
 
 module.exports = {

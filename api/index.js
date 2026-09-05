@@ -22,26 +22,32 @@ app.use((req, res, next) => {
 const bot = initBot();
 
 // --- Vercel Telegram Webhook Handler ---
+// IMPORTANT: Do not pass 'res' to bot.handleUpdate so Telegraf uses direct Telegram Bot API calls
 app.post('/api/webhook', async (req, res) => {
   if (!bot) {
-    return res.status(500).json({ error: 'Bot is not initialized' });
+    console.warn('[Webhook] Bot is not initialized');
+    return res.status(200).send('Bot not ready');
   }
 
   try {
-    // Process incoming Telegram update in serverless context
-    await bot.handleUpdate(req.body, res);
-    if (!res.headersSent) {
-      res.status(200).send('OK');
+    if (req.body && typeof req.body === 'object') {
+      await bot.handleUpdate(req.body);
     }
   } catch (err) {
-    console.error('[Webhook Error]', err);
-    if (!res.headersSent) {
-      res.status(500).send('Error');
-    }
+    console.error('[Webhook Handle Error]', err.message);
+  }
+
+  // Always respond 200 OK to Telegram so Telegram does not retry
+  if (!res.headersSent) {
+    res.status(200).send('OK');
   }
 });
 
-// Helper endpoint to register webhook with Telegram Bot API with 1-click in browser
+app.get('/api/webhook', (req, res) => {
+  res.send('✅ Webhook endpoint is active and listening for Telegram POST requests.');
+});
+
+// Helper endpoint to register/verify webhook with Telegram Bot API
 app.get('/api/setup-webhook', async (req, res) => {
   if (!bot) {
     return res.status(500).send('BOT_TOKEN is not set in environment variables');
@@ -54,12 +60,16 @@ app.get('/api/setup-webhook', async (req, res) => {
     const webhookUrl = `${currentDomain}/api/webhook`;
 
     await bot.telegram.setWebhook(webhookUrl);
+    const info = await bot.telegram.getWebhookInfo();
+
     res.send(`
-      <div style="font-family: sans-serif; padding: 30px; text-align: center;">
+      <div style="font-family: sans-serif; padding: 30px; text-align: center; direction: rtl; line-height: 1.8;">
         <h2 style="color: #2ea6ff;">✅ وب‌هوک تلگرام با موفقیت فعال شد!</h2>
-        <p>آدرس وب‌هوک ثبت‌شده: <code>${webhookUrl}</code></p>
-        <p>هم‌اکنون ربات در تلگرام آماده دریافت فایل و پیام صوتی است.</p>
-        <a href="/" style="display: inline-block; padding: 10px 20px; background: #2ea6ff; color: #fff; text-decoration: none; border-radius: 8px; margin-top: 15px;">ورود به مینی‌اپ</a>
+        <p><b>آدرس ثبت‌شده:</b> <code style="direction: ltr; display: inline-block;">${webhookUrl}</code></p>
+        <p><b>وضعیت اتصال تلگرام:</b> <span style="color: green;">آماده و متصل (pending updates: ${info.pending_update_count})</span></p>
+        <div style="margin-top: 20px;">
+          <a href="/" style="display: inline-block; padding: 10px 20px; background: #2ea6ff; color: #fff; text-decoration: none; border-radius: 8px;">ورود به مینی‌اپ</a>
+        </div>
       </div>
     `);
   } catch (err) {
