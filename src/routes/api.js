@@ -134,8 +134,11 @@ router.delete('/playlists/:id/tracks/:trackId', async (req, res) => {
   }
 });
 
-// --- Audio Streaming Proxy ---
-// Streams file from Telegram Bot API securely without exposing bot token
+// In-memory cache for direct CDN links to eliminate Telegram API lookup latency
+const streamLinkCache = new Map();
+
+// --- Fast Audio Streaming (Direct Telegram CDN Redirect) ---
+// Redirects the browser directly to Telegram's high-speed CDN without intermediate server proxying
 router.get('/stream/:fileId', async (req, res) => {
   const { fileId } = req.params;
   const bot = getBot();
@@ -145,49 +148,18 @@ router.get('/stream/:fileId', async (req, res) => {
   }
 
   try {
-    // 1. Get direct Telegram file download link
-    const fileLink = await bot.telegram.getFileLink(fileId);
-    const targetUrl = new URL(fileLink.href);
-
-    // 2. Prepare headers, forwarding client Range header if present
-    const headers = {};
-    if (req.headers.range) {
-      headers['Range'] = req.headers.range;
+    let href = streamLinkCache.get(fileId);
+    if (!href) {
+      const fileLink = await bot.telegram.getFileLink(fileId);
+      href = fileLink.href;
+      streamLinkCache.set(fileId, href);
+      setTimeout(() => streamLinkCache.delete(fileId), 50 * 60 * 1000);
     }
 
-    const options = {
-      protocol: targetUrl.protocol,
-      hostname: targetUrl.hostname,
-      port: targetUrl.port || 443,
-      path: targetUrl.pathname + targetUrl.search,
-      method: 'GET',
-      headers
-    };
-
-    // 3. Pipe stream to client
-    const proxyReq = https.request(options, (proxyRes) => {
-      // Forward status code (200 OK or 206 Partial Content)
-      res.writeHead(proxyRes.statusCode, {
-        'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg',
-        'Content-Length': proxyRes.headers['content-length'],
-        'Content-Range': proxyRes.headers['content-range'],
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'private, max-age=3600'
-      });
-
-      proxyRes.pipe(res);
-    });
-
-    proxyReq.on('error', (err) => {
-      console.error('[Stream Error] Proxy error:', err.message);
-      if (!res.headersSent) {
-        res.status(502).json({ error: 'Failed to stream audio file from Telegram' });
-      }
-    });
-
-    proxyReq.end();
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.redirect(302, href);
   } catch (err) {
-    console.error('[Stream Error] Could not retrieve file link:', err.message);
+    console.error('[Stream Error]', err.message);
     res.status(404).json({ error: 'Audio file not found or expired on Telegram server' });
   }
 });

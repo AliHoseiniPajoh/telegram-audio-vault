@@ -6,6 +6,7 @@
 class AudioEngine {
   constructor() {
     this.audio = new Audio();
+    this.audio.preload = 'auto';
     this.queue = [];
     this.currentIndex = -1;
     this.isPlaying = false;
