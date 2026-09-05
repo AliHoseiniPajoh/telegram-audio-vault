@@ -36,12 +36,12 @@ function initBot() {
     // 1. Private Chat Interactions
     if (ctx.chat?.type === 'private') {
       const senderId = ctx.from ? String(ctx.from.id).trim() : null;
-      const allowedId = config.allowedUserId ? String(config.allowedUserId).trim() : null;
+      const allowedId = config.allowedUserId ? String(config.allowedUserId).trim().replace(/['"]/g, '') : null;
 
       if (allowedId && senderId !== allowedId) {
         console.warn(`[Bot Security] Blocked user: ${senderId} (Expected: ${allowedId})`);
         try {
-          await ctx.reply('⛔ دسترسی غیرمجاز: این ربات کاملاً شخصی و خصوصی است.');
+          await ctx.reply(`⛔ دسترسی غیرمجاز: این ربات کاملاً شخصی و اختصاصی است.\n\nشناسه تلگرام شما: ${senderId}\nشناسه مجاز در سیستم: ${allowedId}`);
         } catch (_) {}
         return;
       }

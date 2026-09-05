@@ -137,8 +137,69 @@ router.delete('/playlists/:id/tracks/:trackId', async (req, res) => {
 // In-memory cache for direct CDN links to eliminate Telegram API lookup latency
 const streamLinkCache = new Map();
 
-// --- Fast Audio Streaming (Direct Telegram CDN Redirect) ---
-// Redirects the browser directly to Telegram's high-speed CDN without intermediate server proxying
+function streamAudioFromUrl(targetUrlStr, reqHeaders, res, maxRedirects = 3) {
+  if (maxRedirects <= 0) {
+    if (!res.headersSent) res.status(502).json({ error: 'Too many redirects from Telegram' });
+    return;
+  }
+
+  try {
+    const targetUrl = new URL(targetUrlStr);
+    const headers = {};
+    if (reqHeaders.range) {
+      headers['Range'] = reqHeaders.range;
+    }
+
+    const proxyReq = https.request(
+      {
+        protocol: targetUrl.protocol,
+        hostname: targetUrl.hostname,
+        port: targetUrl.port || 443,
+        path: targetUrl.pathname + targetUrl.search,
+        method: 'GET',
+        headers
+      },
+      (proxyRes) => {
+        // Follow redirect internally if any
+        if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
+          return streamAudioFromUrl(proxyRes.headers.location, reqHeaders, res, maxRedirects - 1);
+        }
+
+        const resHeaders = {
+          'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg',
+          'Accept-Ranges': 'bytes',
+          'Cache-Control': 'public, max-age=86400'
+        };
+        if (proxyRes.headers['content-length']) {
+          resHeaders['Content-Length'] = proxyRes.headers['content-length'];
+        }
+        if (proxyRes.headers['content-range']) {
+          resHeaders['Content-Range'] = proxyRes.headers['content-range'];
+        }
+
+        res.writeHead(proxyRes.statusCode, resHeaders);
+        proxyRes.pipe(res);
+      }
+    );
+
+    proxyReq.on('error', (err) => {
+      console.error('[Stream Proxy Error]', err.message);
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Failed to stream audio file' });
+      }
+    });
+
+    proxyReq.end();
+  } catch (err) {
+    console.error('[Stream URL Error]', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Invalid audio stream URL' });
+    }
+  }
+}
+
+// --- Audio Streaming Proxy ---
+// Streams file from Telegram Bot API via Vercel server proxy to bypass Iranian ISP blocking of api.telegram.org
 router.get('/stream/:fileId', async (req, res) => {
   const { fileId } = req.params;
   const bot = getBot();
@@ -156,11 +217,12 @@ router.get('/stream/:fileId', async (req, res) => {
       setTimeout(() => streamLinkCache.delete(fileId), 50 * 60 * 1000);
     }
 
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.redirect(302, href);
+    streamAudioFromUrl(href, req.headers, res);
   } catch (err) {
     console.error('[Stream Error]', err.message);
-    res.status(404).json({ error: 'Audio file not found or expired on Telegram server' });
+    if (!res.headersSent) {
+      res.status(404).json({ error: 'Audio file not found or expired on Telegram server' });
+    }
   }
 });
 

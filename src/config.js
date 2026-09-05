@@ -4,10 +4,10 @@ try {
 } catch (_) {}
 
 const config = {
-  botToken: process.env.BOT_TOKEN || '',
-  allowedUserId: process.env.ALLOWED_USER_ID ? String(process.env.ALLOWED_USER_ID).trim() : '',
+  botToken: process.env.BOT_TOKEN ? String(process.env.BOT_TOKEN).trim().replace(/['"]/g, '') : '',
+  allowedUserId: process.env.ALLOWED_USER_ID ? String(process.env.ALLOWED_USER_ID).trim().replace(/['"]/g, '') : '',
   port: parseInt(process.env.PORT || '3000', 10),
-  webAppUrl: process.env.WEBAPP_URL || `http://localhost:${process.env.PORT || 3000}`,
+  webAppUrl: process.env.WEBAPP_URL ? String(process.env.WEBAPP_URL).trim().replace(/['"]/g, '').replace(/\/+$/, '') : `http://localhost:${process.env.PORT || 3000}`,
   nodeEnv: process.env.NODE_ENV || 'development',
   dataDir: path.resolve(__dirname, '../data'),
   publicDir: path.resolve(__dirname, '../public')

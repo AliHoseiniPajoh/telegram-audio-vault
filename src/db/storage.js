@@ -8,38 +8,30 @@ const DB_FILE = path.join(storageDir, 'vault.json');
 
 /**
  * Safely extracts ONLY HTTPS REST API endpoints for Upstash / Vercel KV.
- * Strictly ignores TCP redis:// URLs (like STORAGE_URL, REDIS_URL, KV_URL) which crash fetch().
+ * Supports all common Vercel Upstash integration prefixes: STORAGE_REDIS_, STORAGE_REST_, UPSTASH_REDIS_, KV_
  */
 function getRestEndpoint() {
-  const urlCandidates = [
-    process.env.STORAGE_REST_API_URL,
-    process.env.KV_REST_API_URL,
-    process.env.UPSTASH_REDIS_REST_URL
-  ];
-  const tokenCandidates = [
-    process.env.STORAGE_REST_API_TOKEN,
-    process.env.KV_REST_API_TOKEN,
-    process.env.UPSTASH_REDIS_REST_TOKEN
+  const pairs = [
+    { url: process.env.STORAGE_REDIS_REST_URL, token: process.env.STORAGE_REDIS_REST_TOKEN },
+    { url: process.env.STORAGE_REST_API_URL, token: process.env.STORAGE_REST_API_TOKEN },
+    { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN },
+    { url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN }
   ];
 
-  let validUrl = '';
-  for (const u of urlCandidates) {
-    if (u && typeof u === 'string' && u.trim().startsWith('https://')) {
-      validUrl = u.trim();
-      break;
+  for (const pair of pairs) {
+    if (
+      pair.url &&
+      typeof pair.url === 'string' &&
+      pair.url.trim().startsWith('https://') &&
+      pair.token &&
+      typeof pair.token === 'string' &&
+      pair.token.trim().length > 0
+    ) {
+      return {
+        url: pair.url.trim().replace(/\/+$/, ''),
+        token: pair.token.trim()
+      };
     }
-  }
-
-  let validToken = '';
-  for (const t of tokenCandidates) {
-    if (t && typeof t === 'string' && t.trim().length > 0) {
-      validToken = t.trim();
-      break;
-    }
-  }
-
-  if (validUrl && validToken) {
-    return { url: validUrl, token: validToken };
   }
   return null;
 }
@@ -62,6 +54,7 @@ class Storage {
   constructor() {
     this.ensureDataDir();
     this.data = this.loadLocal();
+    this.lastSync = 0;
   }
 
   ensureDataDir() {
@@ -99,10 +92,17 @@ class Storage {
     }
   }
 
-  // Safe Cloud Sync with 2s timeout and error suppression to prevent 500 errors
+  // Cloud Sync with Upstash REST API
   async syncFromKV() {
     const kv = getRestEndpoint();
     if (!kv) return;
+
+    // Cache sync for 1.5s to prevent hammering
+    const now = Date.now();
+    if (now - this.lastSync < 1500) {
+      return;
+    }
+    this.lastSync = now;
 
     try {
       const controller = new AbortController();
@@ -121,7 +121,7 @@ class Storage {
 
       if (res.ok) {
         const json = await res.json();
-        if (json && json.result) {
+        if (json && json.result !== undefined && json.result !== null) {
           const parsed = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
           if (parsed && Array.isArray(parsed.tracks)) {
             this.data = parsed;
@@ -130,7 +130,7 @@ class Storage {
         }
       }
     } catch (err) {
-      console.warn('[Storage] Cloud sync skipped (fallback to local):', err.message);
+      console.warn('[Storage] Cloud sync skipped (using local):', err.message);
     }
   }
 
@@ -235,7 +235,6 @@ class Storage {
     }
     this.data.tracks.push(newTrack);
 
-    // Auto-add to target playlist OR default Favorites playlist
     if (!Array.isArray(this.data.playlists) || this.data.playlists.length === 0) {
       this.data.playlists = [
         {

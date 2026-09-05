@@ -10,7 +10,7 @@ const { config } = require('../config');
  * @param {number} maxAgeSeconds - Maximum allowed age in seconds (default: 86400 / 24 hours)
  * @returns {{ valid: boolean, user?: object, reason?: string }}
  */
-function verifyTelegramWebAppData(initData, botToken, maxAgeSeconds = 86400) {
+function verifyTelegramWebAppData(initData, botToken, maxAgeSeconds = 30 * 86400) {
   if (!initData || typeof initData !== 'string') {
     return { valid: false, reason: 'initData is missing or invalid' };
   }
@@ -106,13 +106,14 @@ function telegramAuthMiddleware(req, res, next) {
   }
 
   // Strict User ID whitelist check
-  const userId = verification.user ? String(verification.user.id) : null;
+  const userId = verification.user ? String(verification.user.id).trim() : null;
+  const allowedId = config.allowedUserId ? String(config.allowedUserId).trim().replace(/['"]/g, '') : null;
 
-  if (!userId || userId !== config.allowedUserId) {
-    console.warn(`[Security Alert] Access denied for unauthorized user ID: ${userId}. Allowed: ${config.allowedUserId}`);
+  if (allowedId && (!userId || userId !== allowedId)) {
+    console.warn(`[Security Alert] Access denied for unauthorized user ID: ${userId}. Allowed: ${allowedId}`);
     return res.status(403).json({
       error: 'Forbidden',
-      message: 'Access Denied: This personal audio vault is strictly private.'
+      message: `دسترسی غیرمجاز: شناسه کاربری ${userId} با شناسه مالک مطابقت ندارد.`
     });
   }
 
