@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: telegram-audio-vault
+    runtime: node
+    plan: free
+    region: frankfurt # Low latency
+    buildCommand: npm install
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: BOT_TOKEN
+        sync: false
+      - key: ALLOWED_USER_ID
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
