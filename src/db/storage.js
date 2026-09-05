@@ -6,9 +6,16 @@ const { config } = require('../config');
 const storageDir = process.env.VERCEL ? '/tmp' : config.dataDir;
 const DB_FILE = path.join(storageDir, 'vault.json');
 
-// Upstash / Vercel KV environment variables
-const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
-const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+// Upstash / Vercel KV environment variables (supports all Vercel prefixes: KV_, UPSTASH_, STORAGE_)
+const KV_URL = process.env.KV_REST_API_URL || 
+               process.env.UPSTASH_REDIS_REST_URL || 
+               process.env.STORAGE_REST_API_URL || 
+               process.env.STORAGE_URL || '';
+
+const KV_TOKEN = process.env.KV_REST_API_TOKEN || 
+                 process.env.UPSTASH_REDIS_REST_TOKEN || 
+                 process.env.STORAGE_REST_API_TOKEN || 
+                 process.env.STORAGE_TOKEN || '';
 
 const defaultState = {
   tracks: [],
