@@ -1,7 +1,63 @@
 /**
- * Audio Engine - Robust HTML5 Audio Manager
- * Supports queue, repeat, shuffle, speed control, and native lockscreen MediaSession
+ * Audio Cache - Native IndexedDB Device Storage
+ * Stores full audio blobs locally on the user's phone for 0ms instantaneous offline playback
  */
+const AudioCache = {
+  dbPromise: null,
+  getDb() {
+    if (!this.dbPromise) {
+      this.dbPromise = new Promise((resolve) => {
+        if (!('indexedDB' in window)) return resolve(null);
+        try {
+          const req = indexedDB.open('AudioVaultStorage', 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('audio_files')) {
+              db.createObjectStore('audio_files');
+            }
+          };
+          req.onsuccess = (e) => resolve(e.target.result);
+          req.onerror = () => resolve(null);
+        } catch (_) {
+          resolve(null);
+        }
+      });
+    }
+    return this.dbPromise;
+  },
+
+  async get(fileId) {
+    try {
+      const db = await this.getDb();
+      if (!db) return null;
+      return new Promise((resolve) => {
+        const tx = db.transaction('audio_files', 'readonly');
+        const store = tx.objectStore('audio_files');
+        const req = store.get(fileId);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      });
+    } catch (_) {
+      return null;
+    }
+  },
+
+  async put(fileId, blob) {
+    try {
+      const db = await this.getDb();
+      if (!db || !blob) return false;
+      return new Promise((resolve) => {
+        const tx = db.transaction('audio_files', 'readwrite');
+        const store = tx.objectStore('audio_files');
+        store.put(blob, fileId);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch (_) {
+      return false;
+    }
+  }
+};
 
 class AudioEngine {
   constructor() {
@@ -10,14 +66,17 @@ class AudioEngine {
     this.queue = [];
     this.currentIndex = -1;
     this.isPlaying = false;
+    this.isBuffering = false;
     this.isShuffle = false;
     this.repeatMode = 'off'; // 'off' | 'all' | 'one'
     this.playbackRate = 1.0;
+    this.currentBlobUrl = null;
 
     this.listeners = {
       trackChange: [],
       timeUpdate: [],
       stateChange: [],
+      buffering: [],
       error: []
     };
 
@@ -28,7 +87,31 @@ class AudioEngine {
   initAudioEvents() {
     this.audio.addEventListener('play', () => {
       this.isPlaying = true;
+      this.isBuffering = false;
       this.emit('stateChange', { isPlaying: true });
+      this.emit('buffering', { isBuffering: false });
+    });
+
+    this.audio.addEventListener('playing', () => {
+      this.isPlaying = true;
+      this.isBuffering = false;
+      this.emit('stateChange', { isPlaying: true });
+      this.emit('buffering', { isBuffering: false });
+    });
+
+    this.audio.addEventListener('waiting', () => {
+      this.isBuffering = true;
+      this.emit('buffering', { isBuffering: true });
+    });
+
+    this.audio.addEventListener('canplay', () => {
+      this.isBuffering = false;
+      this.emit('buffering', { isBuffering: false });
+    });
+
+    this.audio.addEventListener('loadstart', () => {
+      this.isBuffering = true;
+      this.emit('buffering', { isBuffering: true });
     });
 
     this.audio.addEventListener('pause', () => {
@@ -64,6 +147,8 @@ class AudioEngine {
 
     this.audio.addEventListener('error', (e) => {
       console.error('[Audio Error]', e);
+      this.isBuffering = false;
+      this.emit('buffering', { isBuffering: false });
       this.emit('error', { message: 'خطا در پخش فایل صوتی' });
     });
   }
@@ -122,20 +207,85 @@ class AudioEngine {
     return null;
   }
 
-  loadCurrentTrack(autoPlay = true) {
+  async loadCurrentTrack(autoPlay = true) {
     const track = this.getCurrentTrack();
     if (!track) return;
 
-    const streamUrl = window.ApiClient.getStreamUrl(track.fileId);
-    this.audio.src = streamUrl;
-    this.audio.playbackRate = this.playbackRate;
+    // Revoke previous blob URL to prevent memory leaks
+    if (this.currentBlobUrl) {
+      try {
+        URL.revokeObjectURL(this.currentBlobUrl);
+      } catch (_) {}
+      this.currentBlobUrl = null;
+    }
 
     this.updateMediaSessionMetadata(track);
     this.emit('trackChange', track);
+    this.isBuffering = true;
+    this.emit('buffering', { isBuffering: true });
 
-    if (autoPlay) {
-      this.play();
+    const streamUrl = window.ApiClient.getStreamUrl(track.fileId);
+
+    // 1. Check if audio is already cached in local device storage (IndexedDB)
+    const cachedBlob = await AudioCache.get(track.fileId);
+
+    if (cachedBlob) {
+      console.log('[AudioCache] Playing instantly from local device storage:', track.title);
+      this.currentBlobUrl = URL.createObjectURL(cachedBlob);
+      this.audio.src = this.currentBlobUrl;
+      this.audio.playbackRate = this.playbackRate;
+      this.isBuffering = false;
+      this.emit('buffering', { isBuffering: false });
+
+      if (autoPlay) {
+        this.play();
+      }
+    } else {
+      // 2. Not yet cached: Stream from server and cache in background
+      this.audio.src = streamUrl;
+      this.audio.playbackRate = this.playbackRate;
+
+      if (autoPlay) {
+        this.play();
+      }
+
+      // Download and save to local phone cache for instant replay next time
+      fetch(streamUrl)
+        .then((res) => (res.ok ? res.blob() : null))
+        .then((blob) => {
+          if (blob && blob.size > 1000) {
+            AudioCache.put(track.fileId, blob);
+            console.log('[AudioCache] Track cached permanently to device storage:', track.title);
+          }
+        })
+        .catch(() => {});
     }
+
+    // Preload next track in queue to cache
+    this.preloadNextTrack();
+  }
+
+  async preloadNextTrack() {
+    if (this.queue.length <= 1) return;
+    const nextIdx = (this.currentIndex + 1) % this.queue.length;
+    const nextTrack = this.queue[nextIdx];
+    if (!nextTrack) return;
+
+    try {
+      const exists = await AudioCache.get(nextTrack.fileId);
+      if (!exists) {
+        const nextUrl = window.ApiClient.getStreamUrl(nextTrack.fileId);
+        fetch(nextUrl)
+          .then((res) => (res.ok ? res.blob() : null))
+          .then((blob) => {
+            if (blob && blob.size > 1000) {
+              AudioCache.put(nextTrack.fileId, blob);
+              console.log('[AudioCache] Pre-cached next track in background:', nextTrack.title);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch (_) {}
   }
 
   play() {

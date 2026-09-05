@@ -179,6 +179,7 @@ const UI = {
     // Bind AudioEngine Events
     window.AudioEngine.on('trackChange', (track) => this.onTrackChange(track));
     window.AudioEngine.on('stateChange', ({ isPlaying }) => this.onStateChange(isPlaying));
+    window.AudioEngine.on('buffering', ({ isBuffering }) => this.onBuffering(isBuffering));
     window.AudioEngine.on('timeUpdate', ({ currentTime, duration, progress }) => {
       if (!isSeeking) {
         this.onTimeUpdate(currentTime, duration, progress);
@@ -250,12 +251,25 @@ const UI = {
     });
   },
 
-  onStateChange(isPlaying) {
-    // Mini play button
-    this.dom.miniPlayBtn.innerHTML = isPlaying ? Icons.pause : Icons.play;
+  onBuffering(isBuffering) {
+    if (isBuffering) {
+      this.dom.miniPlayBtn.innerHTML = Icons.spinner;
+      this.dom.btnPlay.innerHTML = Icons.spinner;
+    } else {
+      const isPlaying = window.AudioEngine.isPlaying;
+      this.dom.miniPlayBtn.innerHTML = isPlaying ? Icons.pause : Icons.play;
+      this.dom.btnPlay.innerHTML = isPlaying ? Icons.pause : Icons.play;
+    }
+  },
 
-    // Expanded play button
-    this.dom.btnPlay.innerHTML = isPlaying ? Icons.pause : Icons.play;
+  onStateChange(isPlaying) {
+    if (!window.AudioEngine.isBuffering) {
+      // Mini play button
+      this.dom.miniPlayBtn.innerHTML = isPlaying ? Icons.pause : Icons.play;
+
+      // Expanded play button
+      this.dom.btnPlay.innerHTML = isPlaying ? Icons.pause : Icons.play;
+    }
 
     // Artwork animation & soundwave
     this.dom.artworkCard.classList.toggle('playing', isPlaying);

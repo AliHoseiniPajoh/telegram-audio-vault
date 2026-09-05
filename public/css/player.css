@@ -356,3 +356,17 @@
 .chip-btn:active {
   background: var(--card-active);
 }
+
+/* Buffering / Loading Spinner Animation */
+.icon-spin {
+  animation: player-spin 0.9s linear infinite;
+}
+
+@keyframes player-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

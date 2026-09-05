@@ -168,7 +168,7 @@ function streamAudioFromUrl(targetUrlStr, reqHeaders, res, maxRedirects = 3) {
         const resHeaders = {
           'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg',
           'Accept-Ranges': 'bytes',
-          'Cache-Control': 'public, max-age=86400'
+          'Cache-Control': 'public, max-age=31536000, immutable'
         };
         if (proxyRes.headers['content-length']) {
           resHeaders['Content-Length'] = proxyRes.headers['content-length'];
