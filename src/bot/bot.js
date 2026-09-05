@@ -105,24 +105,23 @@ function initBot() {
     const media = extractAudioMetadata(message);
     if (!media) return false;
 
-    // Determine target playlist
-    let targetPlaylist = null;
+    // Determine target playlist name from source channel or forward headers
+    let targetPlaylistName = null;
     if (sourceChannelTitle) {
-      targetPlaylist = storage.getOrCreatePlaylistByName(sourceChannelTitle);
+      targetPlaylistName = sourceChannelTitle;
     } else if (message.forward_from_chat?.title) {
-      targetPlaylist = storage.getOrCreatePlaylistByName(message.forward_from_chat.title);
+      targetPlaylistName = message.forward_from_chat.title;
     } else if (message.forward_origin?.chat?.title) {
-      targetPlaylist = storage.getOrCreatePlaylistByName(message.forward_origin.chat.title);
+      targetPlaylistName = message.forward_origin.chat.title;
     }
 
-    const playlistId = targetPlaylist ? targetPlaylist.id : null;
-    const track = await storage.addTrack(media, playlistId);
+    const track = await storage.addTrack(media, targetPlaylistName);
 
-    console.log(`[Bot Media] Saved "${track.title}" | Playlist: ${targetPlaylist ? targetPlaylist.name : 'Favorites'}`);
+    console.log(`[Bot Media] Saved "${track.title}" | Playlist: ${targetPlaylistName || 'Favorites'}`);
 
     // If in private chat, send confirmation response
     if (ctx.chat?.type === 'private') {
-      const plName = targetPlaylist ? targetPlaylist.name : 'Favorites';
+      const plName = targetPlaylistName || 'Favorites';
       const webAppUrl = getValidWebAppUrl();
       const replyText = 
 `✅ موزیک دریافت شد و به کتابخانه اضافه شد.
@@ -132,15 +131,15 @@ function initBot() {
 📂 پلی‌لیست: ${plName}`;
 
       try {
-        const buttons = [];
+        const extra = { disable_notification: true };
         if (webAppUrl) {
-          buttons.push([Markup.button.webApp('▶️ باز کردن در مینی‌اپ', webAppUrl)]);
+          extra.reply_markup = {
+            inline_keyboard: [[Markup.button.webApp('▶️ باز کردن در مینی‌اپ', webAppUrl)]]
+          };
         }
-
-        await ctx.reply(replyText, buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined);
+        await ctx.reply(replyText, extra);
       } catch (err) {
         console.error('[Reply Error]', err.message);
-        await ctx.reply(replyText);
       }
     } else if (ctx.chat?.type === 'channel' && config.allowedUserId) {
       // In channel post, notify owner privately in their bot chat
@@ -153,15 +152,17 @@ function initBot() {
 🎵 عنوان: ${track.title}
 👤 هنرمند: ${track.performer}`;
 
-        const buttons = [];
+        const extra = { disable_notification: true };
         if (webAppUrl) {
-          buttons.push([Markup.button.webApp('▶️ باز کردن در مینی‌اپ', webAppUrl)]);
+          extra.reply_markup = {
+            inline_keyboard: [[Markup.button.webApp('▶️ باز کردن در مینی‌اپ', webAppUrl)]]
+          };
         }
 
         await ctx.telegram.sendMessage(
           config.allowedUserId,
           notifyText,
-          buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined
+          extra
         );
       } catch (_) {}
     }

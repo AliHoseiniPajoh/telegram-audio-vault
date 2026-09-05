@@ -93,13 +93,13 @@ class Storage {
   }
 
   // Cloud Sync with Upstash REST API
-  async syncFromKV() {
+  async syncFromKV(force = false) {
     const kv = getRestEndpoint();
     if (!kv) return;
 
-    // Cache sync for 1.5s to prevent hammering
+    // Cache sync for 1.5s to prevent hammering unless force is true
     const now = Date.now();
-    if (now - this.lastSync < 1500) {
+    if (!force && now - this.lastSync < 1500) {
       return;
     }
     this.lastSync = now;
@@ -140,8 +140,60 @@ class Storage {
 
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 2000);
+      const timer = setTimeout(() => controller.abort(), 3000);
 
+      // Fetch latest remote state to merge and prevent race-condition overwrite
+      const getRes = await fetch(kv.url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${kv.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(['GET', 'telegram_audio_vault_data']),
+        signal: controller.signal
+      });
+
+      if (getRes.ok) {
+        const json = await getRes.json();
+        if (json && json.result) {
+          const remote = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
+          if (remote && Array.isArray(remote.tracks)) {
+            // Merge remote tracks into local (keyed by fileUniqueId or id)
+            const trackMap = new Map();
+            for (const t of remote.tracks) {
+              const key = t.fileUniqueId || t.id;
+              trackMap.set(key, t);
+            }
+            for (const t of this.data.tracks || []) {
+              const key = t.fileUniqueId || t.id;
+              trackMap.set(key, t);
+            }
+            this.data.tracks = Array.from(trackMap.values());
+
+            // Merge remote playlists into local
+            const plMap = new Map();
+            for (const pl of remote.playlists || []) {
+              plMap.set(pl.name.toLowerCase(), { ...pl });
+            }
+            for (const pl of this.data.playlists || []) {
+              const key = pl.name.toLowerCase();
+              if (plMap.has(key)) {
+                const existing = plMap.get(key);
+                const combinedTrackIds = Array.from(
+                  new Set([...(existing.trackIds || []), ...(pl.trackIds || [])])
+                );
+                plMap.set(key, { ...existing, ...pl, trackIds: combinedTrackIds });
+              } else {
+                plMap.set(key, pl);
+              }
+            }
+            this.data.playlists = Array.from(plMap.values());
+            this.saveLocal(this.data);
+          }
+        }
+      }
+
+      // Write back combined data
       await fetch(kv.url, {
         method: 'POST',
         headers: {
@@ -203,18 +255,27 @@ class Storage {
     return this.createPlaylist(cleanName);
   }
 
-  async addTrack(metadata, playlistId = null) {
-    await this.syncFromKV();
+  async addTrack(metadata, playlistIdOrName = null) {
+    await this.syncFromKV(true);
+
+    // Resolve or create playlist dynamically after KV sync
+    let targetPlaylist = null;
+    if (playlistIdOrName && typeof playlistIdOrName === 'string') {
+      const cleanIdent = playlistIdOrName.trim();
+      targetPlaylist = (this.data.playlists || []).find(
+        (p) => p.id === cleanIdent || p.name.toLowerCase() === cleanIdent.toLowerCase()
+      );
+      if (!targetPlaylist) {
+        targetPlaylist = this.createPlaylist(cleanIdent);
+      }
+    }
 
     const existing = this.getTrackByFileUniqueId(metadata.fileUniqueId);
     if (existing) {
       existing.fileId = metadata.fileId;
       existing.updatedAt = new Date().toISOString();
-      if (playlistId) {
-        const pl = (this.data.playlists || []).find((p) => p.id === playlistId);
-        if (pl && !pl.trackIds.includes(existing.id)) {
-          pl.trackIds.push(existing.id);
-        }
+      if (targetPlaylist && !targetPlaylist.trackIds.includes(existing.id)) {
+        targetPlaylist.trackIds.push(existing.id);
       }
       await this.save();
       return existing;
@@ -251,13 +312,12 @@ class Storage {
       ];
     }
 
-    if (playlistId) {
-      const pl = this.data.playlists.find((p) => p.id === playlistId);
-      if (pl && !pl.trackIds.includes(newTrack.id)) {
-        pl.trackIds.push(newTrack.id);
+    if (targetPlaylist) {
+      if (!targetPlaylist.trackIds.includes(newTrack.id)) {
+        targetPlaylist.trackIds.push(newTrack.id);
       }
     } else {
-      const defaultPl = this.data.playlists[0];
+      const defaultPl = this.data.playlists.find((p) => p.isDefault) || this.data.playlists[0];
       if (defaultPl && !defaultPl.trackIds.includes(newTrack.id)) {
         defaultPl.trackIds.push(newTrack.id);
       }
