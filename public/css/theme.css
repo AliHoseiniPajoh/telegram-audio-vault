@@ -1,0 +1,148 @@
+/**
+ * Telegram Mini App Theme & Base Design System
+ * 100% reactive to Telegram.WebApp themeParams
+ */
+
+:root {
+  /* Telegram System Variables with OLED Dark Fallbacks */
+  --bg-color: var(--tg-theme-bg-color, #0f1115);
+  --text-color: var(--tg-theme-text-color, #f5f6f8);
+  --hint-color: var(--tg-theme-hint-color, #8b929e);
+  --link-color: var(--tg-theme-link-color, #3897f0);
+  --button-color: var(--tg-theme-button-color, #2ea6ff);
+  --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+  --secondary-bg-color: var(--tg-theme-secondary-bg-color, #181c24);
+  --header-bg-color: var(--tg-theme-header-bg-color, #14171d);
+  --accent-text-color: var(--tg-theme-accent-text-color, #3ea4f5);
+  --section-bg-color: var(--tg-theme-section-bg-color, #1c212b);
+  --destructive-color: var(--tg-theme-destructive-text-color, #ff4958);
+
+  /* Derived Glassmorphism and Elevation Tokens */
+  --glass-bg: rgba(24, 28, 36, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --card-hover: rgba(255, 255, 255, 0.04);
+  --card-active: rgba(255, 255, 255, 0.08);
+  --player-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --glow-accent: 0 4px 20px rgba(46, 166, 255, 0.35);
+
+  /* Transition Curves (Prototype / Native Grade) */
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 280ms;
+  --duration-sheet: 360ms;
+
+  /* Safe Area Spacing for Mobile Devices */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* Base Reset & Mobile-First Constraints */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+/* App Container */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Header */
+.app-header {
+  padding: calc(var(--sat) + 12px) 16px 12px 16px;
+  background: var(--bg-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--glass-border);
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-badge svg {
+  color: var(--button-color);
+}
+
+.brand-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.vault-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(46, 166, 255, 0.12);
+  color: var(--button-color);
+  letter-spacing: 0.02em;
+}
+
+/* Buttons and Interactive Elements */
+button {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--duration-fast) var(--ease-out-expo), opacity var(--duration-fast);
+}
+
+button:active {
+  transform: scale(0.94);
+  opacity: 0.8;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color);
+  transition: background-color var(--duration-fast) ease;
+}
+
+.icon-btn:active {
+  background-color: var(--card-active);
+}
