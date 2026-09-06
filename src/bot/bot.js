@@ -179,87 +179,171 @@ function initBot() {
 
     const isYouTube = /(?:youtube\.com|youtu\.be)/i.test(url);
     const isSoundCloud = /soundcloud\.com/i.test(url);
-    const isSpotify = /open\.spotify\.com\/track/i.test(url);
+    const isSpotify = /open\.spotify\.com\/(?:track|album|playlist)/i.test(url);
 
     if (!isYouTube && !isSoundCloud && !isSpotify) {
       return false;
     }
 
     const platformName = isYouTube ? 'یوتیوب (YouTube)' : isSoundCloud ? 'ساندکلاد (SoundCloud)' : 'اسپاتیفای (Spotify)';
-    const statusMsg = await ctx.reply(`🔍 در حال دریافت و استخراج فایل صوتی از ${platformName}... لطفاً چند لحظه صبر کنید.`);
+    const statusMsg = await ctx.reply(`🔍 در حال دریافت مشخصات اثر از ${platformName}... لطفاً چند لحظه صبر کنید.`);
 
     try {
-      let targetUrl = url;
       let trackTitle = 'موزیک آنلاین';
       let trackArtist = platformName;
+      let trackCover = null;
 
-      // Handle Spotify: resolve metadata via oEmbed
+      // 1. Spotify Link Handling
       if (isSpotify) {
         try {
-          const oembedRes = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
+          const oembedRes = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+          });
           if (oembedRes.ok) {
             const spData = await oembedRes.json();
             if (spData.title) trackTitle = spData.title;
-            if (spData.author_name) trackArtist = spData.author_name;
+            if (spData.thumbnail_url) trackCover = spData.thumbnail_url;
           }
         } catch (_) {}
-      }
 
-      // Query Cobalt API instances for direct audio download stream
-      const cobaltInstances = [
-        'https://api.cobalt.tools/api/json',
-        'https://cobalt.api.sc-0.fun/api/json',
-        'https://api.wuk.sh/api/json'
-      ];
-
-      let audioStreamUrl = null;
-      for (const instance of cobaltInstances) {
         try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 8000);
-          const cRes = await fetch(instance, {
-            method: 'POST',
-            headers: {
-              Accept: 'application/json',
-              'Content-Type': 'application/json',
-              'User-Agent': 'Mozilla/5.0'
-            },
-            body: JSON.stringify({
-              url: targetUrl,
-              downloadMode: 'audio',
-              audioFormat: 'mp3'
-            }),
-            signal: controller.signal
+          const pageRes = await fetch(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
           });
-          clearTimeout(timer);
-
-          if (cRes.ok) {
-            const data = await cRes.json();
-            if (data.url) {
-              audioStreamUrl = data.url;
-              break;
+          if (pageRes.ok) {
+            const html = await pageRes.text();
+            const descMatch = html.match(/property="og:description"\s+content="([^"]+)"/i);
+            if (descMatch) {
+              const parts = descMatch[1].split('·').map((s) => s.trim());
+              if (parts.length > 0 && parts[0]) {
+                trackArtist = parts[0];
+              }
+            }
+            if (!trackTitle) {
+              const ogTitle = html.match(/property="og:title"\s+content="([^"]+)"/i);
+              if (ogTitle) trackTitle = ogTitle[1];
             }
           }
         } catch (_) {}
-      }
 
-      if (!audioStreamUrl) {
-        throw new Error('سرور مبدل در دسترس نبود یا لینک محافظت‌شده است.');
-      }
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
+        } catch (_) {}
 
-      // Reply with audio to Telegram - Telegram Cloud CDN will ingest it
-      await ctx.replyWithAudio(
-        { url: audioStreamUrl, filename: `${trackTitle}.mp3` },
-        {
-          title: trackTitle,
-          performer: trackArtist,
-          caption: `📥 دانلود خودکار از ${platformName}`
+        const captionLines = [
+          `🎧 *موزیک اسپاتیفای شناسایی شد!*\n`,
+          `🎵 *عنوان:* ${trackTitle}`,
+          `👤 *هنرمند:* ${trackArtist}\n`,
+          `🔒 *توضیح فنی اسپاتیفای:* تمام فایل‌های صوتی اسپاتیفای دارای رمزنگاری انحصاری DRM (Widevine) هستند و امکان استخراج مستقیم لینک خام MP3 در وب بدون سرور اختصاصی وجود ندارد.\n`,
+          `⚡️ *روش فوق‌سریع برای افزودن به صندوقچه:*`,
+          `۱. دکمه زیر را لمس کرده و لینک را در ربات تلگرام اسپاتیفای ارسال کنید.`,
+          `۲. فایل صوتی دریافت‌شده را برای همین بات *فوروارد (Forward)* کنید تا فوراً با کاور، متن و پلیر مینی‌اپ ذخیره شود!`
+        ];
+
+        const inlineButtons = [
+          [
+            {
+              text: '📥 دانلود با بات اسپاتیفای (@SpotifySaveBot)',
+              url: 'https://t.me/SpotifySaveBot'
+            }
+          ],
+          [
+            {
+              text: '🔍 جستجوی آهنگ در بات (@vkmusic_bot)',
+              url: 'https://t.me/vkmusic_bot'
+            }
+          ],
+          [
+            {
+              text: '🌐 باز کردن در اپلیکیشن اسپاتیفای',
+              url: url
+            }
+          ]
+        ];
+
+        if (trackCover) {
+          await ctx.replyWithPhoto(
+            { url: trackCover },
+            {
+              caption: captionLines.join('\n'),
+              parse_mode: 'Markdown',
+              reply_markup: { inline_keyboard: inlineButtons }
+            }
+          );
+        } else {
+          await ctx.reply(captionLines.join('\n'), {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: inlineButtons }
+          });
         }
-      );
+
+        return true;
+      }
+
+      // 2. YouTube & SoundCloud metadata resolution
+      if (isYouTube) {
+        try {
+          const ytRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+          if (ytRes.ok) {
+            const ytData = await ytRes.json();
+            if (ytData.title) trackTitle = ytData.title;
+            if (ytData.author_name) trackArtist = ytData.author_name;
+            if (ytData.thumbnail_url) trackCover = ytData.thumbnail_url;
+          }
+        } catch (_) {}
+      } else if (isSoundCloud) {
+        try {
+          const scRes = await fetch(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+          if (scRes.ok) {
+            const scData = await scRes.json();
+            if (scData.title) trackTitle = scData.title;
+            if (scData.author_name) trackArtist = scData.author_name;
+            if (scData.thumbnail_url) trackCover = scData.thumbnail_url;
+          }
+        } catch (_) {}
+      }
 
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
       } catch (_) {}
+
+      const captionLines = [
+        `🎬 *اطلاعات فایل ${platformName}:*\n`,
+        `🎵 *عنوان:* ${trackTitle}`,
+        `👤 *هنرمند:* ${trackArtist}\n`,
+        `💡 برای ذخیره پایدار در صندوقچه مینی‌اپ، لطفاً فایل صوتی را مستقیماً ارسال فرمایید یا از کانال‌ها و بات‌های موزیک تلگرام به این چت *فوروارد (Forward)* نمایید.`
+      ];
+
+      const ytButtons = [
+        [
+          {
+            text: '🔍 جستجو در بات موزیک تلگرام (@vkmusic_bot)',
+            url: 'https://t.me/vkmusic_bot'
+          }
+        ],
+        [
+          {
+            text: `🌐 باز کردن در ${platformName}`,
+            url: url
+          }
+        ]
+      ];
+
+      if (trackCover) {
+        await ctx.replyWithPhoto(
+          { url: trackCover },
+          {
+            caption: captionLines.join('\n'),
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: ytButtons }
+          }
+        );
+      } else {
+        await ctx.reply(captionLines.join('\n'), {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: ytButtons }
+        });
+      }
 
       return true;
     } catch (err) {
@@ -269,7 +353,7 @@ function initBot() {
           ctx.chat.id,
           statusMsg.message_id,
           undefined,
-          `⚠️ خطا در استخراج صوت از لینک: ${err.message}\n💡 لطفاً فایل موزیک را مستقیماً یا به صورت فوروارد ارسال کنید.`
+          `⚠️ خطا در پردازش لینک: ${err.message}\n💡 لطفاً فایل موزیک را مستقیماً یا به صورت فوروارد ارسال فرمایید.`
         );
       } catch (_) {}
       return true;
