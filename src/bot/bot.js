@@ -246,14 +246,14 @@ function initBot() {
         const inlineButtons = [
           [
             {
-              text: '📥 دانلود با بات اسپاتیفای (@SpotifySaveBot)',
-              url: 'https://t.me/SpotifySaveBot'
+              text: '📥 دانلود با @MusicsHuntersbot',
+              url: 'https://t.me/MusicsHuntersbot'
             }
           ],
           [
             {
-              text: '🔍 جستجوی آهنگ در بات (@vkmusic_bot)',
-              url: 'https://t.me/vkmusic_bot'
+              text: '📥 دانلود با @SpotifySaveBot',
+              url: 'https://t.me/SpotifySaveBot'
             }
           ],
           [
@@ -314,13 +314,19 @@ function initBot() {
         `🎬 *اطلاعات فایل ${platformName}:*\n`,
         `🎵 *عنوان:* ${trackTitle}`,
         `👤 *هنرمند:* ${trackArtist}\n`,
-        `💡 برای ذخیره پایدار در صندوقچه مینی‌اپ، لطفاً فایل صوتی را مستقیماً ارسال فرمایید یا از کانال‌ها و بات‌های موزیک تلگرام به این چت *فوروارد (Forward)* نمایید.`
+        `💡 برای ذخیره پایدار در صندوقچه مینی‌اپ، کافیست فایل صوتی را از @MusicsHuntersbot یا کانال‌های موزیک به این چت *فوروارد (Forward)* نمایید.`
       ];
 
       const ytButtons = [
         [
           {
-            text: '🔍 جستجو در بات موزیک تلگرام (@vkmusic_bot)',
+            text: '📥 دانلود با @MusicsHuntersbot',
+            url: 'https://t.me/MusicsHuntersbot'
+          }
+        ],
+        [
+          {
+            text: '🔍 جستجو در بات موزیک (@vkmusic_bot)',
             url: 'https://t.me/vkmusic_bot'
           }
         ],
@@ -376,12 +382,13 @@ function initBot() {
       const webAppUrl = getValidWebAppUrl();
       const buttons = [];
       if (webAppUrl) {
-        buttons.push([Markup.button.webApp('🎵 باز کردن مینی‌اپ', webAppUrl)]);
+        buttons.push([Markup.button.webApp('🎵 باز کردن صندوقچه صوتی', webAppUrl)]);
       }
+      buttons.push([Markup.button.url('📥 جستجو و دانلود در @MusicsHuntersbot', 'https://t.me/MusicsHuntersbot')]);
 
       await ctx.reply(
-        '💡 برای افزودن موزیک به کتابخانه، لطفاً یک فایل صوتی (MP3, M4A, FLAC, ...) یا وویس ارسال کنید، یا لینک SoundCloud / YouTube / Spotify بفرستید.',
-        buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined
+        '💡 برای افزودن موزیک به کتابخانه:\n\n۱. فایل صوتی یا وویس را مستقیماً بفرستید یا از ربات @MusicsHuntersbot فوروارد (Forward) کنید.\n۲. یا لینک آهنگ در اسپاتیفای، یوتیوب یا ساندکلاد را ارسال کنید.',
+        Markup.inlineKeyboard(buttons)
       );
     }
   });
