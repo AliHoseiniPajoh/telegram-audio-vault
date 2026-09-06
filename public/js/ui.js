@@ -407,33 +407,65 @@ const UI = {
     }
   },
 
+  async toggleLikeTrack(trackId, btnElement = null) {
+    if (!trackId) return;
+    window.TelegramBridge.haptic.impact('medium');
+
+    let favPl = (window.App.playlists || []).find((p) => p.id === 'pl_favorites' || p.isDefault);
+    if (!favPl) {
+      favPl = { id: 'pl_favorites', name: 'موردعلاقه‌ها', isDefault: true, trackIds: [] };
+      if (!Array.isArray(window.App.playlists)) window.App.playlists = [];
+      window.App.playlists.push(favPl);
+    }
+
+    if (!Array.isArray(favPl.trackIds)) favPl.trackIds = [];
+    const isCurrentlyLiked = favPl.trackIds.includes(trackId);
+
+    if (isCurrentlyLiked) {
+      favPl.trackIds = favPl.trackIds.filter((id) => id !== trackId);
+      if (btnElement) {
+        btnElement.classList.remove('active');
+        btnElement.innerHTML = Icons.heartOutline;
+        btnElement.title = 'افزودن به موردعلاقه‌ها';
+      }
+      this.showToast('از موردعلاقه‌ها حذف شد');
+      const cur = window.AudioEngine.getCurrentTrack();
+      if (cur && cur.id === trackId) {
+        this.updateLikeButton(false);
+      }
+      try {
+        await window.ApiClient.removeTrackFromPlaylist(favPl.id, trackId);
+      } catch (err) {
+        console.error('Like toggle error:', err);
+      }
+    } else {
+      favPl.trackIds.push(trackId);
+      if (btnElement) {
+        btnElement.classList.add('active');
+        btnElement.innerHTML = Icons.heart;
+        btnElement.title = 'حذف از موردعلاقه‌ها';
+        btnElement.style.animation = 'none';
+        btnElement.offsetHeight; // trigger reflow
+        btnElement.style.animation = 'appleHeartPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.2)';
+      }
+      this.showToast('به موردعلاقه‌ها اضافه شد ❤️');
+      const cur = window.AudioEngine.getCurrentTrack();
+      if (cur && cur.id === trackId) {
+        this.updateLikeButton(true);
+      }
+      try {
+        await window.ApiClient.addTrackToPlaylist(favPl.id, trackId);
+      } catch (err) {
+        console.error('Like toggle error:', err);
+      }
+    }
+  },
+
   async toggleLikeCurrentTrack() {
     const track = window.AudioEngine.getCurrentTrack();
     if (!track) return;
-
-    window.TelegramBridge.haptic.impact('medium');
-
-    const favPl = (window.App.playlists || []).find((p) => p.id === 'pl_favorites');
-    const isLiked = favPl && Array.isArray(favPl.trackIds) && favPl.trackIds.includes(track.id);
-
-    try {
-      if (isLiked) {
-        favPl.trackIds = favPl.trackIds.filter((id) => id !== track.id);
-        this.updateLikeButton(false);
-        this.showToast('از علاقه‌مندی‌ها حذف شد');
-        await window.ApiClient.removeTrackFromPlaylist('pl_favorites', track.id);
-      } else {
-        if (favPl) {
-          if (!Array.isArray(favPl.trackIds)) favPl.trackIds = [];
-          if (!favPl.trackIds.includes(track.id)) favPl.trackIds.push(track.id);
-        }
-        this.updateLikeButton(true);
-        this.showToast('به علاقه‌مندی‌ها اضافه شد ❤️');
-        await window.ApiClient.addTrackToPlaylist('pl_favorites', track.id);
-      }
-    } catch (err) {
-      console.error('Like toggle error:', err);
-    }
+    const listBtn = this.dom.contentView.querySelector(`.fav-btn[data-id="${track.id}"]`);
+    await this.toggleLikeTrack(track.id, listBtn);
   },
 
   updateLikeButton(isLiked) {
@@ -543,6 +575,9 @@ const UI = {
 
     const currentTrack = window.AudioEngine.getCurrentTrack();
 
+    const favPl = (window.App.playlists || []).find((p) => p.id === 'pl_favorites' || p.isDefault);
+    const favTrackIds = new Set(favPl && Array.isArray(favPl.trackIds) ? favPl.trackIds : []);
+
     const html = tracks.map((track, idx) => {
       const isPlayingThis = currentTrack && currentTrack.id === track.id;
       const durationStr = this.formatTime(track.duration);
@@ -552,6 +587,11 @@ const UI = {
       const dlClass = isDownloaded ? 'downloaded' : '';
       const dlTitle = isDownloaded ? 'ذخیره شده در حافظه گوشی (پخش آفلاین)' : 'دانلود و ذخیره دائمی در حافظه گوشی';
 
+      const isLiked = favTrackIds.has(track.id);
+      const favClass = isLiked ? 'active' : '';
+      const favIcon = isLiked ? Icons.heart : Icons.heartOutline;
+      const favTitle = isLiked ? 'حذف از موردعلاقه‌ها' : 'افزودن به موردعلاقه‌ها';
+
       return `
         <div class="track-item ${isPlayingThis ? 'playing' : ''}" data-id="${track.id}" data-index="${idx}">
           <div class="track-artwork-badge">${icon}</div>
@@ -559,19 +599,19 @@ const UI = {
             <div class="track-name">${this.escapeHTML(track.title)}</div>
             <div class="track-sub">
               <span>${this.escapeHTML(track.performer)}</span>
-              <span>•</span>
+              <span class="dot-sep">•</span>
               <span>${durationStr}</span>
             </div>
           </div>
           <div class="track-actions">
+            <button class="track-action-btn fav-btn ${favClass}" data-id="${track.id}" title="${favTitle}">
+              ${favIcon}
+            </button>
             <button class="track-action-btn download-btn ${dlClass}" data-id="${track.id}" data-file-id="${track.fileId}" title="${dlTitle}">
               ${dlIcon}
             </button>
-            <button class="track-action-btn play-native" data-id="${track.id}" title="ارسال به چت تلگرام (پخش فوری در پلیر تلگرام بدون دانلود)">
+            <button class="track-action-btn play-native" data-id="${track.id}" title="ارسال به چت تلگرام (پخش فوری)">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-            </button>
-            <button class="track-action-btn add-to-pl" data-id="${track.id}" title="افزودن به پلی‌لیست">
-              ${Icons.plus}
             </button>
             <button class="track-action-btn delete" data-id="${track.id}" title="حذف فایل">
               ${Icons.trash}
@@ -590,6 +630,15 @@ const UI = {
         const index = parseInt(item.dataset.index, 10);
         window.TelegramBridge.haptic.impact('light');
         window.AudioEngine.setQueue(tracks, index, true);
+      });
+    });
+
+    // Bind Favorite (Heart) Toggle
+    this.dom.contentView.querySelectorAll('.fav-btn').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const trackId = btn.dataset.id;
+        await this.toggleLikeTrack(trackId, btn);
       });
     });
 
@@ -655,15 +704,6 @@ const UI = {
         } catch (err) {
           this.showToast('❌ خطا در ارسال: ' + (err.message || 'ناموفق'));
         }
-      });
-    });
-
-    // Bind Add to Playlist
-    this.dom.contentView.querySelectorAll('.add-to-pl').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.TelegramBridge.haptic.impact('light');
-        this.openAddToPlaylistModal(btn.dataset.id);
       });
     });
 
@@ -967,31 +1007,77 @@ const UI = {
   },
 
   confirmDeleteTrack(trackId, isPlaylistView) {
-    const body = `<p style="font-size: 14px; color: var(--hint-color);">آیا از حذف کامل این فایل از صندوقچه صوتی اطمینان دارید؟</p>`;
+    const isInsidePlaylist = isPlaylistView && window.UI.activePlaylistId;
+    const title = isInsidePlaylist ? 'حذف از پلی‌لیست' : 'حذف فایل صوتی';
+    const msg = isInsidePlaylist
+      ? 'آیا می‌خواهید این فایل از این پلی‌لیست حذف شود؟ (فایل در صندوقچه باقی می‌ماند)'
+      : 'آیا از حذف کامل این فایل از صندوقچه صوتی اطمینان دارید؟ این عملیات قابل بازگشت نیست.';
+    const confirmBtnText = isInsidePlaylist ? 'حذف از پلی‌لیست' : 'حذف دائمی';
+
+    const body = `<p style="font-size: 14.5px; line-height: 1.55; color: var(--apple-label-secondary);">${msg}</p>`;
     const actions = `
       <button class="btn-secondary" id="modal-cancel">انصراف</button>
-      <button class="btn-primary" id="modal-delete-track" style="background: var(--destructive-color);">حذف دائمی</button>
+      <button class="btn-primary" id="modal-delete-track" style="background: var(--apple-destructive); box-shadow: 0 4px 14px rgba(255, 69, 58, 0.4);">${confirmBtnText}</button>
     `;
 
-    this.openModal('حذف فایل صوتی', body, actions);
+    this.openModal(title, body, actions);
     document.getElementById('modal-cancel').onclick = () => this.closeModal();
     document.getElementById('modal-delete-track').onclick = async () => {
+      const btn = document.getElementById('modal-delete-track');
+      if (btn) btn.disabled = true;
+
       try {
-        await window.ApiClient.deleteTrack(trackId);
-        this.closeModal();
-        this.showToast('فایل با موفقیت حذف شد');
+        if (isInsidePlaylist) {
+          await window.ApiClient.removeTrackFromPlaylist(window.UI.activePlaylistId, trackId);
+          this.closeModal();
+          this.showToast('فایل از پلی‌لیست حذف شد');
+        } else {
+          // 1. Send API request
+          await window.ApiClient.deleteTrack(trackId);
+
+          // 2. Remove from local list
+          window.App.tracks = (window.App.tracks || []).filter((t) => t.id !== trackId);
+
+          // 3. Remove from AudioCache if downloaded
+          const targetItem = this.dom.contentView.querySelector(`.track-item[data-id="${trackId}"]`);
+          const fileId = targetItem?.querySelector('.download-btn')?.dataset?.fileId;
+          if (fileId && window.AudioCache) {
+            await window.AudioCache.delete(fileId);
+            this.downloadedFileIds.delete(fileId);
+          }
+
+          // 4. Smooth Apple exit animation
+          if (targetItem) {
+            targetItem.style.transition = 'all 240ms cubic-bezier(0.32, 0.72, 0, 1)';
+            targetItem.style.opacity = '0';
+            targetItem.style.transform = 'scale(0.9) translateX(20px)';
+            setTimeout(() => targetItem.remove(), 240);
+          }
+
+          // 5. If currently playing, stop
+          const cur = window.AudioEngine.getCurrentTrack();
+          if (cur && cur.id === trackId) {
+            window.AudioEngine.stop();
+            this.dom.miniPlayer.classList.add('hidden');
+          }
+
+          this.closeModal();
+          this.showToast('🗑️ فایل با موفقیت حذف شد');
+        }
+
         window.App.refreshCurrentView();
       } catch (err) {
-        alert(err.message);
+        alert(err.message || 'خطا در حذف فایل');
+        if (btn) btn.disabled = false;
       }
     };
   },
 
   confirmDeletePlaylist(playlistId) {
-    const body = `<p style="font-size: 14px; color: var(--hint-color);">آیا از حذف این پلی‌لیست اطمینان دارید؟ (فایل‌های اصلی صوتی حذف نخواهند شد).</p>`;
+    const body = `<p style="font-size: 14.5px; line-height: 1.55; color: var(--apple-label-secondary);">آیا از حذف این پلی‌لیست اطمینان دارید؟ (فایل‌های اصلی صوتی حذف نخواهند شد).</p>`;
     const actions = `
       <button class="btn-secondary" id="modal-cancel">انصراف</button>
-      <button class="btn-primary" id="modal-delete-pl" style="background: var(--destructive-color);">حذف پلی‌لیست</button>
+      <button class="btn-primary" id="modal-delete-pl" style="background: var(--apple-destructive); box-shadow: 0 4px 14px rgba(255, 69, 58, 0.4);">حذف پلی‌لیست</button>
     `;
 
     this.openModal('حذف پلی‌لیست', body, actions);

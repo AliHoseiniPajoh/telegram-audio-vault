@@ -41,12 +41,13 @@ const defaultState = {
   playlists: [
     {
       id: 'pl_favorites',
-      name: 'Favorites',
+      name: 'موردعلاقه‌ها',
       isDefault: true,
       trackIds: [],
       createdAt: new Date().toISOString()
     }
   ],
+  deletedTrackIds: [],
   version: 1
 };
 
@@ -124,6 +125,23 @@ class Storage {
         if (json && json.result !== undefined && json.result !== null) {
           const parsed = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
           if (parsed && Array.isArray(parsed.tracks)) {
+            // Apply deletedTrackIds tombstones
+            const deletedSet = new Set([
+              ...(this.data.deletedTrackIds || []),
+              ...(parsed.deletedTrackIds || [])
+            ]);
+            parsed.deletedTrackIds = Array.from(deletedSet);
+            parsed.tracks = parsed.tracks.filter(
+              (t) => !deletedSet.has(t.id) && !deletedSet.has(t.fileUniqueId)
+            );
+            if (Array.isArray(parsed.playlists)) {
+              parsed.playlists.forEach((pl) => {
+                if (pl.id === 'pl_favorites' && pl.name === 'Favorites') {
+                  pl.name = 'موردعلاقه‌ها';
+                }
+                pl.trackIds = (pl.trackIds || []).filter((tid) => !deletedSet.has(tid));
+              });
+            }
             this.data = parsed;
             this.saveLocal(this.data);
           }
@@ -134,66 +152,80 @@ class Storage {
     }
   }
 
-  async syncToKV() {
+  async syncToKV(mergeWithRemote = false) {
     const kv = getRestEndpoint();
     if (!kv) return;
 
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3000);
+      const timer = setTimeout(() => controller.abort(), 3500);
 
-      // Fetch latest remote state to merge and prevent race-condition overwrite
-      const getRes = await fetch(kv.url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${kv.token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(['GET', 'telegram_audio_vault_data']),
-        signal: controller.signal
-      });
+      const deletedSet = new Set(this.data.deletedTrackIds || []);
 
-      if (getRes.ok) {
-        const json = await getRes.json();
-        if (json && json.result) {
-          const remote = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
-          if (remote && Array.isArray(remote.tracks)) {
-            // Merge remote tracks into local (keyed by fileUniqueId or id)
-            const trackMap = new Map();
-            for (const t of remote.tracks) {
-              const key = t.fileUniqueId || t.id;
-              trackMap.set(key, t);
-            }
-            for (const t of this.data.tracks || []) {
-              const key = t.fileUniqueId || t.id;
-              trackMap.set(key, t);
-            }
-            this.data.tracks = Array.from(trackMap.values());
+      if (mergeWithRemote) {
+        // Fetch latest remote state to merge on concurrent adds
+        const getRes = await fetch(kv.url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${kv.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(['GET', 'telegram_audio_vault_data']),
+          signal: controller.signal
+        });
 
-            // Merge remote playlists into local
-            const plMap = new Map();
-            for (const pl of remote.playlists || []) {
-              plMap.set(pl.name.toLowerCase(), { ...pl });
-            }
-            for (const pl of this.data.playlists || []) {
-              const key = pl.name.toLowerCase();
-              if (plMap.has(key)) {
-                const existing = plMap.get(key);
-                const combinedTrackIds = Array.from(
-                  new Set([...(existing.trackIds || []), ...(pl.trackIds || [])])
-                );
-                plMap.set(key, { ...existing, ...pl, trackIds: combinedTrackIds });
-              } else {
-                plMap.set(key, pl);
+        if (getRes.ok) {
+          const json = await getRes.json();
+          if (json && json.result) {
+            const remote = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
+            if (remote && Array.isArray(remote.tracks)) {
+              if (Array.isArray(remote.deletedTrackIds)) {
+                for (const dId of remote.deletedTrackIds) deletedSet.add(dId);
               }
+              this.data.deletedTrackIds = Array.from(deletedSet);
+
+              // Merge remote tracks into local, strictly excluding deleted tracks
+              const trackMap = new Map();
+              for (const t of remote.tracks) {
+                const key = t.fileUniqueId || t.id;
+                if (!deletedSet.has(t.id) && !deletedSet.has(t.fileUniqueId)) {
+                  trackMap.set(key, t);
+                }
+              }
+              for (const t of this.data.tracks || []) {
+                const key = t.fileUniqueId || t.id;
+                if (!deletedSet.has(t.id) && !deletedSet.has(t.fileUniqueId)) {
+                  trackMap.set(key, t);
+                }
+              }
+              this.data.tracks = Array.from(trackMap.values());
+
+              // Merge remote playlists into local
+              const plMap = new Map();
+              for (const pl of remote.playlists || []) {
+                const key = pl.id === 'pl_favorites' ? 'موردعلاقه‌ها' : pl.name.toLowerCase();
+                plMap.set(key, { ...pl, name: pl.id === 'pl_favorites' ? 'موردعلاقه‌ها' : pl.name });
+              }
+              for (const pl of this.data.playlists || []) {
+                const key = pl.id === 'pl_favorites' ? 'موردعلاقه‌ها' : pl.name.toLowerCase();
+                if (plMap.has(key)) {
+                  const existing = plMap.get(key);
+                  const combinedTrackIds = Array.from(
+                    new Set([...(existing.trackIds || []), ...(pl.trackIds || [])])
+                  ).filter((tid) => !deletedSet.has(tid));
+                  plMap.set(key, { ...existing, ...pl, trackIds: combinedTrackIds });
+                } else {
+                  plMap.set(key, pl);
+                }
+              }
+              this.data.playlists = Array.from(plMap.values());
+              this.saveLocal(this.data);
             }
-            this.data.playlists = Array.from(plMap.values());
-            this.saveLocal(this.data);
           }
         }
       }
 
-      // Write back combined data
+      // Write authoritative data directly to KV
       await fetch(kv.url, {
         method: 'POST',
         headers: {
@@ -204,14 +236,15 @@ class Storage {
         signal: controller.signal
       });
       clearTimeout(timer);
+      this.lastSync = Date.now();
     } catch (err) {
       console.warn('[Storage] Cloud push skipped:', err.message);
     }
   }
 
-  async save(dataToSave = this.data) {
+  async save(dataToSave = this.data, mergeWithRemote = false) {
     this.saveLocal(dataToSave);
-    await this.syncToKV();
+    await this.syncToKV(mergeWithRemote);
   }
 
   // --- Track Methods ---
@@ -304,7 +337,7 @@ class Storage {
       this.data.playlists = [
         {
           id: 'pl_favorites',
-          name: 'Favorites',
+          name: 'موردعلاقه‌ها',
           isDefault: true,
           trackIds: [],
           createdAt: new Date().toISOString()
@@ -323,25 +356,35 @@ class Storage {
       }
     }
 
-    await this.save();
+    await this.save(this.data, true);
     return newTrack;
   }
 
   async deleteTrack(id) {
     await this.syncFromKV();
 
-    const initialCount = (this.data.tracks || []).length;
-    this.data.tracks = (this.data.tracks || []).filter((t) => t.id !== id);
-
-    if (this.data.tracks.length === initialCount) {
+    const trackToDelete = (this.data.tracks || []).find((t) => t.id === id);
+    if (!trackToDelete) {
       return false;
     }
+
+    // Record tombstone so sync can never resurrect this track
+    if (!Array.isArray(this.data.deletedTrackIds)) {
+      this.data.deletedTrackIds = [];
+    }
+    this.data.deletedTrackIds.push(id);
+    if (trackToDelete.fileUniqueId) {
+      this.data.deletedTrackIds.push(trackToDelete.fileUniqueId);
+    }
+
+    this.data.tracks = (this.data.tracks || []).filter((t) => t.id !== id);
 
     (this.data.playlists || []).forEach((pl) => {
       pl.trackIds = (pl.trackIds || []).filter((tid) => tid !== id);
     });
 
-    await this.save();
+    // Authoritative overwrite with mergeWithRemote = false
+    await this.save(this.data, false);
     return true;
   }
 
@@ -351,6 +394,7 @@ class Storage {
     await this.syncFromKV();
     return (this.data.playlists || []).map((pl) => ({
       ...pl,
+      name: pl.id === 'pl_favorites' ? 'موردعلاقه‌ها' : pl.name,
       trackCount: (pl.trackIds || []).length
     }));
   }
@@ -366,6 +410,7 @@ class Storage {
 
     return {
       ...pl,
+      name: pl.id === 'pl_favorites' ? 'موردعلاقه‌ها' : pl.name,
       tracks
     };
   }
@@ -387,7 +432,7 @@ class Storage {
       this.data.playlists = [];
     }
     this.data.playlists.push(newPlaylist);
-    await this.save();
+    await this.save(this.data, false);
     return newPlaylist;
   }
 
@@ -399,7 +444,7 @@ class Storage {
     }
 
     this.data.playlists = (this.data.playlists || []).filter((p) => p.id !== id);
-    await this.save();
+    await this.save(this.data, false);
     return true;
   }
 
@@ -413,7 +458,7 @@ class Storage {
 
     if (!pl.trackIds.includes(trackId)) {
       pl.trackIds.push(trackId);
-      await this.save();
+      await this.save(this.data, false);
     }
     return pl;
   }
@@ -424,7 +469,7 @@ class Storage {
     if (!pl) throw new Error('Playlist not found');
 
     pl.trackIds = (pl.trackIds || []).filter((tid) => tid !== trackId);
-    await this.save();
+    await this.save(this.data, false);
     return pl;
   }
 }

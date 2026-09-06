@@ -26,7 +26,10 @@ const App = {
         userBadge.textContent = auth.user.first_name;
       }
 
-      // Initial data fetch
+      // Initial data fetch: preload playlists so Favorites state is known immediately
+      try {
+        this.playlists = await window.ApiClient.getPlaylists();
+      } catch (_) {}
       await this.loadTracks();
     } catch (err) {
       console.error('⛔ Access Denied or Server Error:', err);

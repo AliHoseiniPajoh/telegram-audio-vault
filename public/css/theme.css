@@ -1,46 +1,60 @@
 /**
- * Telegram Mini App Theme & Base Design System
- * 100% reactive to Telegram.WebApp themeParams
+ * Apple Human Interface Guidelines (HIG) & Telegram Design System
+ * 100% compliant with Apple Music & iOS 18 Design Aesthetics
  */
 
 :root {
-  /* Telegram System Variables with OLED Dark Fallbacks */
-  --bg-color: var(--tg-theme-bg-color, #0f1115);
-  --text-color: var(--tg-theme-text-color, #f5f6f8);
-  --hint-color: var(--tg-theme-hint-color, #8b929e);
-  --link-color: var(--tg-theme-link-color, #3897f0);
-  --button-color: var(--tg-theme-button-color, #2ea6ff);
+  /* Apple iOS Dark Palette (OLED True Black Base) */
+  --bg-color: var(--tg-theme-bg-color, #000000);
+  --text-color: var(--tg-theme-text-color, #ffffff);
+  --hint-color: var(--tg-theme-hint-color, #8e8e93);
+  --link-color: var(--tg-theme-link-color, #0a84ff);
+  --button-color: var(--tg-theme-button-color, #0a84ff);
   --button-text-color: var(--tg-theme-button-text-color, #ffffff);
-  --secondary-bg-color: var(--tg-theme-secondary-bg-color, #181c24);
-  --header-bg-color: var(--tg-theme-header-bg-color, #14171d);
-  --accent-text-color: var(--tg-theme-accent-text-color, #3ea4f5);
-  --section-bg-color: var(--tg-theme-section-bg-color, #1c212b);
-  --destructive-color: var(--tg-theme-destructive-text-color, #ff4958);
+  --secondary-bg-color: var(--tg-theme-secondary-bg-color, #1c1c1e);
+  --header-bg-color: var(--tg-theme-header-bg-color, rgba(0, 0, 0, 0.85));
+  --section-bg-color: var(--tg-theme-section-bg-color, #1c1c1e);
 
-  /* Derived Glassmorphism and Elevation Tokens */
-  --glass-bg: rgba(24, 28, 36, 0.78);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --card-hover: rgba(255, 255, 255, 0.04);
-  --card-active: rgba(255, 255, 255, 0.08);
-  --player-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  --glow-accent: 0 4px 20px rgba(46, 166, 255, 0.35);
+  /* Apple System Colors */
+  --apple-music-pink: #ff2d55;
+  --apple-heart-red: #ff2d55;
+  --apple-blue: #0a84ff;
+  --apple-green: #30d158;
+  --apple-orange: #ff9f0a;
+  --apple-purple: #bf5af2;
+  --apple-destructive: #ff453a;
+  --destructive-color: #ff453a;
 
-  /* Transition Curves (Prototype / Native Grade) */
-  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-  --duration-fast: 150ms;
-  --duration-normal: 280ms;
-  --duration-sheet: 360ms;
+  /* Apple Label & Material Vibrancy */
+  --apple-label-primary: #ffffff;
+  --apple-label-secondary: rgba(235, 235, 245, 0.60);
+  --apple-label-tertiary: rgba(235, 235, 245, 0.38);
+  --apple-separator: rgba(255, 255, 255, 0.08);
 
-  /* Safe Area Spacing for Mobile Devices */
+  /* Apple Frosted Glass Tokens */
+  --glass-bg: rgba(28, 28, 30, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --card-bg: #1c1c1e;
+  --card-hover: rgba(255, 255, 255, 0.05);
+  --card-active: rgba(255, 255, 255, 0.09);
+  --player-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+  --glow-pink: 0 4px 18px rgba(255, 45, 85, 0.35);
+
+  /* Apple iOS Spring Timing Functions */
+  --ease-apple-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-apple-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.2);
+  --duration-fast: 160ms;
+  --duration-normal: 260ms;
+  --duration-sheet: 340ms;
+
+  /* Safe Area Spacing */
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
 }
 
-/* Base Reset & Mobile-First Constraints */
+/* Base Reset & Mobile Constraints */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -56,10 +70,12 @@ html, body {
   overflow: hidden;
   background-color: var(--bg-color);
   color: var(--text-color);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Vazirmatn", system-ui, sans-serif;
   font-size: 15px;
-  line-height: 1.45;
-  letter-spacing: -0.01em;
+  line-height: 1.42;
+  letter-spacing: -0.015em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* App Container */
@@ -71,50 +87,64 @@ html, body {
   width: 100%;
   position: relative;
   overflow: hidden;
+  background: var(--bg-color);
 }
 
-/* Header */
+/* Apple-Style Navigation Header */
 .app-header {
-  padding: calc(var(--sat) + 12px) 16px 12px 16px;
-  background: var(--bg-color);
+  padding: calc(var(--sat) + 10px) 16px 12px 16px;
+  background: var(--header-bg-color);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--glass-border);
-  z-index: 10;
+  border-bottom: 0.5px solid var(--apple-separator);
+  z-index: 20;
   flex-shrink: 0;
 }
 
 .brand-badge {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.brand-badge svg {
-  color: var(--button-color);
+.brand-badge .brand-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #ff2d55 0%, #ff375f 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(255, 45, 85, 0.35);
 }
 
 .brand-title {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text-color);
+  letter-spacing: -0.02em;
 }
 
 .vault-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  gap: 5px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 12px;
-  background: rgba(46, 166, 255, 0.12);
-  color: var(--button-color);
-  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  color: var(--apple-label-secondary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-/* Buttons and Interactive Elements */
+/* Apple Spring Buttons */
 button {
   background: none;
   border: none;
@@ -124,25 +154,40 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform var(--duration-fast) var(--ease-out-expo), opacity var(--duration-fast);
+  transition: transform var(--duration-fast) var(--ease-apple-spring), opacity var(--duration-fast);
 }
 
 button:active {
-  transform: scale(0.94);
-  opacity: 0.8;
+  transform: scale(0.92);
+  opacity: 0.75;
 }
 
 .icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-color);
-  transition: background-color var(--duration-fast) ease;
+  background: rgba(255, 255, 255, 0.06);
+  transition: all var(--duration-fast) var(--ease-apple-spring);
 }
 
 .icon-btn:active {
-  background-color: var(--card-active);
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(0.9);
+}
+
+/* Keyframe Animations */
+@keyframes appleHeartPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.35); }
+  70% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+@keyframes appleFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
