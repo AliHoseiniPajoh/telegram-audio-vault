@@ -132,7 +132,6 @@
   padding: calc(var(--sat) + 12px) 24px calc(var(--sab) + 24px) 24px;
   overflow-y: auto;
   overflow-x: hidden;
-  position: relative;
 }
 
 .expanded-player.open {

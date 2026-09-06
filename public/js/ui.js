@@ -1299,7 +1299,8 @@ const UI = {
 
   getRecentlyPlayedTracks() {
     try {
-      const ids = JSON.parse(localStorage.getItem('vault_recently_played') || '[]');
+      const parsed = JSON.parse(localStorage.getItem('vault_recently_played') || '[]');
+      const ids = Array.isArray(parsed) ? parsed : [];
       const allTracks = window.App.tracks || [];
       const trackMap = new Map(allTracks.map((t) => [t.id, t]));
       return ids.map((id) => trackMap.get(id)).filter(Boolean);
@@ -1310,7 +1311,8 @@ const UI = {
 
   getMostPlayedTracks() {
     try {
-      const counts = JSON.parse(localStorage.getItem('vault_play_counts') || '{}');
+      const parsed = JSON.parse(localStorage.getItem('vault_play_counts') || '{}');
+      const counts = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
       const allTracks = window.App.tracks || [];
       return allTracks
         .filter((t) => counts[t.id] > 0)
@@ -1325,10 +1327,33 @@ const UI = {
     return allTracks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   },
 
+  getTrackVibrantColors(text) {
+    let hash = 0;
+    const str = text || 'music';
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const palettes = [
+      ['rgba(255, 45, 85, 0.45)', 'rgba(175, 82, 222, 0.25)'],   // Pink & Purple
+      ['rgba(10, 132, 255, 0.45)', 'rgba(94, 92, 230, 0.25)'],   // Blue & Indigo
+      ['rgba(48, 209, 88, 0.45)', 'rgba(100, 210, 255, 0.25)'],  // Green & Teal
+      ['rgba(255, 159, 10, 0.45)', 'rgba(255, 55, 95, 0.25)'],   // Orange & Coral
+      ['rgba(191, 90, 242, 0.45)', 'rgba(255, 55, 95, 0.25)'],   // Violet & Pink
+      ['rgba(0, 199, 190, 0.45)', 'rgba(10, 132, 255, 0.25)'],   // Teal & Blue
+    ];
+    return palettes[Math.abs(hash) % palettes.length];
+  },
+
   // --- Dynamic Artwork & Ambient Glow Extraction ---
 
   async loadArtworkAndAmbience(track) {
     if (!track) return;
+
+    // Instant beautiful dynamic ambient glow from track metadata
+    const [col1, col2] = this.getTrackVibrantColors((track.title || '') + (track.performer || ''));
+    if (this.dom.ambientGlow) {
+      this.dom.ambientGlow.style.background = `radial-gradient(circle at center, ${col1} 0%, ${col2} 55%, transparent 75%)`;
+    }
 
     if (track.type === 'voice') {
       this.dom.artworkCard.innerHTML = `
@@ -1341,9 +1366,6 @@ const UI = {
         </div>
       `;
       this.dom.miniArtwork.innerHTML = Icons.mic;
-      if (this.dom.ambientGlow) {
-        this.dom.ambientGlow.style.background = 'radial-gradient(circle at center, rgba(10, 132, 255, 0.28) 0%, transparent 72%)';
-      }
       return;
     }
 
@@ -1354,7 +1376,7 @@ const UI = {
         this.dom.artworkCard.innerHTML = `<img src="${url}" alt="${this.escapeHTML(track.title)}" />`;
         this.dom.miniArtwork.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />`;
 
-        // Extract vibrant ambient color using offscreen canvas
+        // Extract refined ambient color using offscreen canvas when allowed
         const img = new Image();
         img.crossOrigin = 'Anonymous';
         img.onload = () => {
@@ -1380,7 +1402,7 @@ const UI = {
               g = Math.round(g / count);
               b = Math.round(b / count);
               if (this.dom.ambientGlow) {
-                this.dom.ambientGlow.style.background = `radial-gradient(circle at center, rgba(${r}, ${g}, ${b}, 0.48) 0%, transparent 72%)`;
+                this.dom.ambientGlow.style.background = `radial-gradient(circle at center, rgba(${r}, ${g}, ${b}, 0.52) 0%, transparent 75%)`;
               }
             }
           } catch (_) {}
