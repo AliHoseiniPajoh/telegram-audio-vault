@@ -15,12 +15,12 @@
   right: 12px;
   bottom: calc(var(--sab) + var(--nav-height) + 10px);
   height: var(--mini-player-height, 56px);
-  background: rgba(24, 24, 28, 0.88);
+  background: var(--mini-player-bg);
   backdrop-filter: blur(30px) saturate(190%);
   -webkit-backdrop-filter: blur(30px) saturate(190%);
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border: 0.5px solid var(--mini-player-border);
   border-radius: 16px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
   padding: 0 12px;
@@ -55,8 +55,8 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #242426 0%, #161618 100%);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--card-bg);
+  border: 0.5px solid var(--card-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,7 +84,7 @@
 .mini-title {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--apple-label-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -111,8 +111,8 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: var(--pill-btn-bg);
+  color: var(--apple-label-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -133,7 +133,7 @@
 .expanded-player {
   position: fixed;
   inset: 0;
-  background: #000000;
+  background: var(--player-sheet-bg);
   z-index: 100;
   transform: translateY(100%);
   transition: transform var(--duration-sheet) var(--ease-apple-spring);
@@ -178,7 +178,7 @@
   width: 36px;
   height: 5px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--apple-separator);
 }
 
 .sheet-nav {
@@ -192,7 +192,7 @@
   font-size: 11.5px;
   font-weight: 600;
   color: var(--apple-label-secondary);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--pill-btn-bg);
   padding: 4px 12px;
   border-radius: 12px;
   letter-spacing: 0.02em;
@@ -308,7 +308,7 @@
 .track-meta-title {
   font-size: 20px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--player-title);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -317,7 +317,7 @@
 
 .track-meta-artist {
   font-size: 15px;
-  color: var(--apple-label-secondary);
+  color: var(--player-artist);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -328,7 +328,7 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--pill-btn-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -395,7 +395,7 @@
 .ctrl-btn {
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: var(--player-controls-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -416,8 +416,8 @@
 .ctrl-btn-primary {
   width: 64px;
   height: 64px;
-  background: #ffffff;
-  color: #000000;
+  background: var(--player-primary-btn-bg);
+  color: var(--player-primary-btn-color);
   border-radius: 50%;
   box-shadow: 0 8px 24px rgba(255, 255, 255, 0.25);
   padding: 0;
@@ -446,9 +446,9 @@
   height: 34px;
   padding: 0 14px;
   border-radius: 17px;
-  background: rgba(255, 255, 255, 0.09);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: var(--pill-btn-bg);
+  border: 0.5px solid var(--card-border);
+  color: var(--apple-label-primary);
   font-size: 12.5px;
   font-weight: 500;
   display: flex;
@@ -501,8 +501,8 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  background: var(--quick-card-bg);
+  border: 0.5px solid var(--quick-card-border);
   border-radius: 14px;
   margin-top: 8px;
 }
@@ -534,7 +534,7 @@
 .queue-now-title {
   font-size: 14.5px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--apple-label-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -562,8 +562,8 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 0.5px solid rgba(255, 255, 255, 0.05);
+  background: var(--quick-card-bg);
+  border: 0.5px solid var(--quick-card-border);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -588,7 +588,7 @@
 .queue-track-title {
   font-size: 14px;
   font-weight: 500;
-  color: #ffffff;
+  color: var(--apple-label-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -647,10 +647,10 @@
 }
 
 .lyric-line.active {
-  color: #ffffff;
+  color: var(--apple-label-primary);
   filter: none;
   transform: scale(1.04) translateX(-4px);
-  text-shadow: 0 4px 20px rgba(255, 255, 255, 0.45);
+  text-shadow: 0 4px 16px rgba(10, 132, 255, 0.35);
 }
 
 .lyric-empty {
@@ -668,10 +668,10 @@
 .player-bottom-switcher {
   margin: 10px 20px calc(var(--sab) + 14px) 20px;
   height: 40px;
-  background: rgba(118, 118, 128, 0.24);
+  background: var(--switcher-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border: 0.5px solid var(--switcher-border);
   border-radius: 20px;
   display: flex;
   padding: 3px;
@@ -686,7 +686,7 @@
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: rgba(235, 235, 245, 0.6);
+  color: var(--switcher-text);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -697,7 +697,7 @@
 }
 
 .switcher-pill.active {
-  background: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  background: var(--switcher-active-bg);
+  color: var(--switcher-active-text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }

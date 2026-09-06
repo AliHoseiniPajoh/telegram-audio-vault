@@ -1,10 +1,11 @@
 /**
  * Apple Human Interface Guidelines (HIG) & Telegram Design System
  * 100% compliant with Apple Music & iOS 18 Design Aesthetics
+ * Full Dark Mode & Light Mode support
  */
 
 :root {
-  /* Apple iOS Dark Palette (OLED True Black Base) */
+  /* Default Dark Mode Theme Tokens (OLED True Black Base) */
   --bg-color: var(--tg-theme-bg-color, #000000);
   --text-color: var(--tg-theme-text-color, #ffffff);
   --hint-color: var(--tg-theme-hint-color, #8e8e93);
@@ -15,7 +16,7 @@
   --header-bg-color: var(--tg-theme-header-bg-color, rgba(0, 0, 0, 0.85));
   --section-bg-color: var(--tg-theme-section-bg-color, #1c1c1e);
 
-  /* Apple System Colors */
+  /* Apple System Accent Colors */
   --apple-music-pink: #ff2d55;
   --apple-heart-red: #ff2d55;
   --apple-blue: #0a84ff;
@@ -25,35 +26,77 @@
   --apple-destructive: #ff453a;
   --destructive-color: #ff453a;
 
-  /* Apple Label & Material Vibrancy */
+  /* Apple Label & Material Vibrancy (Dark) */
   --apple-label-primary: #ffffff;
   --apple-label-secondary: rgba(235, 235, 245, 0.60);
   --apple-label-tertiary: rgba(235, 235, 245, 0.38);
   --apple-separator: rgba(255, 255, 255, 0.08);
 
-  /* Apple Frosted Glass Tokens */
+  /* Surfaces & Frosted Glass (Dark) */
   --glass-bg: rgba(28, 28, 30, 0.82);
-  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-border: rgba(255, 255, 255, 0.1);
   --card-bg: #1c1c1e;
   --card-hover: rgba(255, 255, 255, 0.05);
   --card-active: rgba(255, 255, 255, 0.09);
-  --player-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
-  --glow-pink: 0 4px 18px rgba(255, 45, 85, 0.35);
+  --card-border: rgba(255, 255, 255, 0.08);
 
-  /* Apple iOS Spring Timing Functions */
-  --ease-apple-spring: cubic-bezier(0.32, 0.72, 0, 1);
-  --ease-apple-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.2);
-  --duration-fast: 160ms;
-  --duration-normal: 260ms;
-  --duration-sheet: 340ms;
+  /* Component Specific Tokens (Dark) */
+  --nav-bg: rgba(18, 18, 20, 0.92);
+  --nav-border: rgba(255, 255, 255, 0.1);
+  --mini-player-bg: rgba(24, 24, 28, 0.88);
+  --mini-player-border: rgba(255, 255, 255, 0.12);
+  --input-bg: rgba(118, 118, 128, 0.22);
+  --input-text: #ffffff;
+  --input-placeholder: rgba(235, 235, 245, 0.5);
+
+  --hero-bg: linear-gradient(135deg, rgba(42, 171, 238, 0.24) 0%, rgba(10, 132, 255, 0.15) 100%), rgba(255, 255, 255, 0.04);
+  --hero-border: rgba(255, 255, 255, 0.12);
+  --hero-title-color: #ffffff;
+  --hero-sub-color: rgba(235, 235, 245, 0.65);
+  --hero-fab-bg: #ffffff;
+  --hero-fab-color: #000000;
+
+  --liked-hero-bg: linear-gradient(135deg, rgba(191, 90, 242, 0.3) 0%, rgba(10, 132, 255, 0.22) 100%), rgba(255, 255, 255, 0.04);
+  --liked-hero-border: rgba(255, 255, 255, 0.12);
+  --liked-hero-title: #ffffff;
+  --liked-hero-count: rgba(255, 255, 255, 0.7);
+
+  --quick-card-bg: rgba(255, 255, 255, 0.05);
+  --quick-card-border: rgba(255, 255, 255, 0.08);
+  --quick-card-title: #ffffff;
+  --quick-card-sub: rgba(235, 235, 245, 0.6);
+
+  --pill-btn-bg: rgba(255, 255, 255, 0.07);
+  --pill-btn-border: rgba(255, 255, 255, 0.08);
+  --pill-btn-text: rgba(235, 235, 245, 0.65);
+
+  --track-item-hover: rgba(255, 255, 255, 0.04);
+  --track-item-playing: rgba(10, 132, 255, 0.14);
+  --track-item-title: #ffffff;
+  --track-item-sub: rgba(235, 235, 245, 0.6);
+  --track-badge-bg: #1c1c1e;
+
+  --modal-bg: #1c1c1e;
+  --modal-border: rgba(255, 255, 255, 0.12);
+  --modal-title: #ffffff;
+  --modal-text: rgba(235, 235, 245, 0.75);
+
+  --player-sheet-bg: #000000;
+  --player-title: #ffffff;
+  --player-artist: rgba(235, 235, 245, 0.65);
+  --player-controls-color: #ffffff;
+  --player-primary-btn-bg: #ffffff;
+  --player-primary-btn-color: #000000;
+  --switcher-bg: rgba(118, 118, 128, 0.24);
+  --switcher-border: rgba(255, 255, 255, 0.08);
+  --switcher-text: rgba(235, 235, 245, 0.6);
+  --switcher-active-bg: rgba(255, 255, 255, 0.22);
+  --switcher-active-text: #ffffff;
 
   /* Telegram Music Brand Tokens */
   --tg-blue: #0a84ff;
   --tg-cyan: #2aabee;
   --tg-accent-gradient: linear-gradient(135deg, #2aabee 0%, #0a84ff 100%);
-  --tg-card-glass: rgba(255, 255, 255, 0.05);
-  --tg-card-border: rgba(255, 255, 255, 0.08);
-  --tg-card-hover: rgba(255, 255, 255, 0.09);
   --nav-height: 56px;
   --mini-player-height: 56px;
 
@@ -62,6 +105,94 @@
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
+
+  /* Animation Timings */
+  --ease-apple-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-apple-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.2);
+  --duration-fast: 160ms;
+  --duration-normal: 260ms;
+  --duration-sheet: 340ms;
+}
+
+/* ==========================================================================
+   LIGHT MODE DESIGN SYSTEM TOKENS (Apple HIG & Telegram Light Palette)
+   ========================================================================== */
+
+:root[data-theme="light"],
+body.light-theme {
+  --bg-color: var(--tg-theme-bg-color, #f2f2f7);
+  --text-color: var(--tg-theme-text-color, #000000);
+  --hint-color: var(--tg-theme-hint-color, #8e8e93);
+  --secondary-bg-color: var(--tg-theme-secondary-bg-color, #ffffff);
+  --header-bg-color: var(--tg-theme-header-bg-color, rgba(242, 242, 247, 0.9));
+  --section-bg-color: var(--tg-theme-section-bg-color, #ffffff);
+
+  /* Apple Label & Material Vibrancy (Light) */
+  --apple-label-primary: #000000;
+  --apple-label-secondary: rgba(60, 60, 67, 0.65);
+  --apple-label-tertiary: rgba(60, 60, 67, 0.4);
+  --apple-separator: rgba(60, 60, 67, 0.12);
+
+  /* Surfaces & Cards (Light) */
+  --card-bg: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --card-hover: rgba(0, 0, 0, 0.04);
+  --card-active: rgba(0, 0, 0, 0.07);
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.08);
+
+  /* Component Specific Tokens (Light) */
+  --nav-bg: rgba(255, 255, 255, 0.94);
+  --nav-border: rgba(0, 0, 0, 0.08);
+  --mini-player-bg: rgba(255, 255, 255, 0.95);
+  --mini-player-border: rgba(0, 0, 0, 0.09);
+  --input-bg: rgba(118, 118, 128, 0.12);
+  --input-text: #000000;
+  --input-placeholder: rgba(60, 60, 67, 0.55);
+
+  --hero-bg: linear-gradient(135deg, rgba(42, 171, 238, 0.18) 0%, rgba(10, 132, 255, 0.1) 100%), #ffffff;
+  --hero-border: rgba(10, 132, 255, 0.2);
+  --hero-title-color: #000000;
+  --hero-sub-color: rgba(60, 60, 67, 0.75);
+  --hero-fab-bg: var(--tg-blue);
+  --hero-fab-color: #ffffff;
+
+  --liked-hero-bg: linear-gradient(135deg, rgba(191, 90, 242, 0.2) 0%, rgba(10, 132, 255, 0.14) 100%), #ffffff;
+  --liked-hero-border: rgba(191, 90, 242, 0.22);
+  --liked-hero-title: #000000;
+  --liked-hero-count: rgba(60, 60, 67, 0.75);
+
+  --quick-card-bg: #ffffff;
+  --quick-card-border: rgba(0, 0, 0, 0.06);
+  --quick-card-title: #000000;
+  --quick-card-sub: rgba(60, 60, 67, 0.65);
+
+  --pill-btn-bg: rgba(118, 118, 128, 0.12);
+  --pill-btn-border: rgba(0, 0, 0, 0.05);
+  --pill-btn-text: rgba(60, 60, 67, 0.75);
+
+  --track-item-hover: rgba(0, 0, 0, 0.04);
+  --track-item-playing: rgba(10, 132, 255, 0.1);
+  --track-item-title: #000000;
+  --track-item-sub: rgba(60, 60, 67, 0.65);
+  --track-badge-bg: #e5e5ea;
+
+  --modal-bg: #ffffff;
+  --modal-border: rgba(0, 0, 0, 0.1);
+  --modal-title: #000000;
+  --modal-text: rgba(60, 60, 67, 0.8);
+
+  --player-sheet-bg: #f7f7fa;
+  --player-title: #000000;
+  --player-artist: rgba(60, 60, 67, 0.75);
+  --player-controls-color: #000000;
+  --player-primary-btn-bg: #000000;
+  --player-primary-btn-color: #ffffff;
+  --switcher-bg: rgba(118, 118, 128, 0.16);
+  --switcher-border: rgba(0, 0, 0, 0.06);
+  --switcher-text: rgba(60, 60, 67, 0.75);
+  --switcher-active-bg: #ffffff;
+  --switcher-active-text: #000000;
 }
 
 /* Base Reset & Mobile Constraints */
@@ -88,7 +219,6 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* App Container */
 #app {
   display: flex;
   flex-direction: column;
@@ -98,106 +228,4 @@ html, body {
   position: relative;
   overflow: hidden;
   background: var(--bg-color);
-}
-
-/* Apple-Style Navigation Header */
-.app-header {
-  padding: calc(var(--sat) + 10px) 16px 12px 16px;
-  background: var(--header-bg-color);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 0.5px solid var(--apple-separator);
-  z-index: 20;
-  flex-shrink: 0;
-}
-
-.brand-badge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brand-badge .brand-icon-box {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, #ff2d55 0%, #ff375f 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  box-shadow: 0 3px 10px rgba(255, 45, 85, 0.35);
-}
-
-.brand-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-color);
-  letter-spacing: -0.02em;
-}
-
-.vault-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
-  color: var(--apple-label-secondary);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-/* Apple Spring Buttons */
-button {
-  background: none;
-  border: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--duration-fast) var(--ease-apple-spring), opacity var(--duration-fast);
-}
-
-button:active {
-  transform: scale(0.92);
-  opacity: 0.75;
-}
-
-.icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-color);
-  background: rgba(255, 255, 255, 0.06);
-  transition: all var(--duration-fast) var(--ease-apple-spring);
-}
-
-.icon-btn:active {
-  background: rgba(255, 255, 255, 0.14);
-  transform: scale(0.9);
-}
-
-/* Keyframe Animations */
-@keyframes appleHeartPop {
-  0% { transform: scale(1); }
-  35% { transform: scale(1.35); }
-  70% { transform: scale(0.92); }
-  100% { transform: scale(1); }
-}
-
-@keyframes appleFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
 }
