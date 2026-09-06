@@ -31,61 +31,23 @@ function initBot() {
 
   bot = new Telegraf(config.botToken);
 
-  // Security Middleware: Handle both Private Chat and Channel Posts
+  // Security Middleware: Open to all users in private chat and channels
   bot.use(async (ctx, next) => {
-    // 1. Private Chat Interactions
-    if (ctx.chat?.type === 'private') {
-      const senderId = ctx.from ? String(ctx.from.id).trim() : null;
-      const allowedId = config.allowedUserId ? String(config.allowedUserId).trim().replace(/['"]/g, '') : null;
-
-      if (allowedId && senderId !== allowedId) {
-        console.warn(`[Bot Security] Blocked user: ${senderId} (Expected: ${allowedId})`);
-        try {
-          await ctx.reply(`⛔ دسترسی غیرمجاز: این ربات کاملاً شخصی و اختصاصی است.\n\nشناسه تلگرام شما: ${senderId}\nشناسه مجاز در سیستم: ${allowedId}`);
-        } catch (_) {}
-        return;
-      }
-      return next();
-    }
-
-    // 2. Channel Posts (when bot is added as admin to owner's channel)
-    if (ctx.chat?.type === 'channel') {
-      const chatId = ctx.chat.id;
-
-      if (verifiedChannelIds.has(chatId)) {
-        return next();
-      }
-
-      try {
-        const admins = await ctx.telegram.getChatAdministrators(chatId);
-        const isOwnerAdmin = admins.some((admin) => String(admin.user.id).trim() === String(config.allowedUserId).trim());
-
-        if (isOwnerAdmin) {
-          verifiedChannelIds.add(chatId);
-          console.log(`[Bot Security] Verified channel "${ctx.chat.title}" for owner.`);
-          return next();
-        } else {
-          console.warn(`[Bot Security] Channel ${chatId} ignored: Owner is not an admin.`);
-          return;
-        }
-      } catch (err) {
-        verifiedChannelIds.add(chatId);
-        return next();
-      }
-    }
-
+    // All private chats and channels are welcomed
     return next();
   });
 
   // /start command: Immediate friendly welcome message with Mini App button
   bot.command('start', async (ctx) => {
     const webAppUrl = getValidWebAppUrl();
+    const userName = ctx.from?.first_name || 'دوست عزیز';
     const welcomeText = 
-`🎧 سلام! به صندوقچه صوتی شخصی خوش آمدید.
+`🎧 سلام ${userName}! به موزیک پلیر تلگرام خوش آمدید.
 
-برای افزودن هر فایل یا پیام صوتی، کافیست آن را به این چت بفرستید یا فوروارد کنید تا در کتابخانه شخصی شما ذخیره شود.
+🎵 برای افزودن آهنگ، پادکست یا وویس، کافیست فایل را به این چت بفرستید یا فوروارد کنید تا در کتابخانه ذخیره شود.
+🔗 همچنین می‌توانید لینک یوتیوب، ساندکلاد یا اسپاتیفای بفرستید تا خودکار دانلود و اضافه شود.
 
-همچنین با ارسال این ربات به کانال تلگرامی‌تان و ادمین کردن آن، موزیک‌های کانال نیز خودکار به مینی‌اپ اضافه می‌شوند.`;
+📱 برای ورود به مینی‌اپ، روی دکمه زیر کلیک کنید:`;
 
     try {
       const buttons = [];
@@ -103,6 +65,10 @@ function initBot() {
   // Unified Media Processor for Audio, Voice, and Audio-Documents
   async function processIncomingMedia(ctx, message, sourceChannelTitle = null) {
     const media = extractAudioMetadata(message);
+    if (media && ctx.from) {
+      media.userId = ctx.from.id;
+      media.userFirstName = ctx.from.first_name || '';
+    }
     if (!media) return false;
 
     // Determine target playlist name from source channel or forward headers

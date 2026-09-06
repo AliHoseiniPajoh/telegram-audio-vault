@@ -17,11 +17,9 @@ const config = {
 function validateConfig() {
   const missing = [];
   if (!config.botToken) missing.push('BOT_TOKEN');
-  if (!config.allowedUserId) missing.push('ALLOWED_USER_ID');
   
   if (missing.length > 0) {
     console.warn(`[Config Warning] Missing required environment variables: ${missing.join(', ')}`);
-    console.warn('Please copy .env.example to .env and fill in your Telegram Bot credentials.');
   }
 }
 

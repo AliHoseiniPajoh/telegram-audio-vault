@@ -21,7 +21,7 @@ router.use(telegramAuthMiddleware);
 router.get('/me', async (req, res) => {
   try {
     const tracks = await storage.getAllTracks();
-    const playlists = await storage.getAllPlaylists();
+    const playlists = await storage.getAllPlaylists(req.telegramUser?.id);
     res.json({
       user: req.telegramUser,
       isOwner: true,
@@ -178,6 +178,16 @@ router.get('/artwork', async (req, res) => {
 
 // Delete a track
 router.delete('/tracks/:id', async (req, res) => {
+  const track = await storage.getTrackById(req.params.id);
+  if (!track) {
+    return res.status(404).json({ error: 'Track not found' });
+  }
+
+  // Non-owners can only delete their own uploaded tracks
+  if (track.userId && req.telegramUser?.id && String(track.userId) !== String(req.telegramUser.id) && !req.isOwner) {
+    return res.status(403).json({ error: 'شما فقط مجاز به حذف آهنگ‌های ارسالی خود هستید.' });
+  }
+
   const success = await storage.deleteTrack(req.params.id);
   if (!success) {
     return res.status(404).json({ error: 'Track not found' });
@@ -189,13 +199,13 @@ router.delete('/tracks/:id', async (req, res) => {
 
 // List all playlists
 router.get('/playlists', async (req, res) => {
-  const playlists = await storage.getAllPlaylists();
+  const playlists = await storage.getAllPlaylists(req.telegramUser?.id);
   res.json({ playlists });
 });
 
 // Get single playlist with tracks
 router.get('/playlists/:id', async (req, res) => {
-  const playlist = await storage.getPlaylistById(req.params.id);
+  const playlist = await storage.getPlaylistById(req.params.id, req.telegramUser?.id);
   if (!playlist) {
     return res.status(404).json({ error: 'Playlist not found' });
   }
@@ -210,7 +220,7 @@ router.post('/playlists', async (req, res) => {
   }
 
   try {
-    const playlist = await storage.createPlaylist(name);
+    const playlist = await storage.createPlaylist(name, req.telegramUser?.id);
     res.status(201).json({ playlist });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -238,7 +248,7 @@ router.post('/playlists/:id/tracks', async (req, res) => {
   }
 
   try {
-    const updated = await storage.addTrackToPlaylist(req.params.id, trackId);
+    const updated = await storage.addTrackToPlaylist(req.params.id, trackId, req.telegramUser?.id);
     res.json({ success: true, playlist: updated });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -248,7 +258,7 @@ router.post('/playlists/:id/tracks', async (req, res) => {
 // Remove track from playlist
 router.delete('/playlists/:id/tracks/:trackId', async (req, res) => {
   try {
-    const updated = await storage.removeTrackFromPlaylist(req.params.id, req.params.trackId);
+    const updated = await storage.removeTrackFromPlaylist(req.params.id, req.params.trackId, req.telegramUser?.id);
     res.json({ success: true, playlist: updated });
   } catch (err) {
     res.status(400).json({ error: err.message });

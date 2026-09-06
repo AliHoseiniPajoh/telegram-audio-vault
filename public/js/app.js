@@ -105,9 +105,9 @@ const App = {
         <div style="width: 72px; height: 72px; border-radius: 24px; background: rgba(255, 73, 88, 0.12); display: flex; align-items: center; justify-content: center; color: var(--destructive-color); margin-bottom: 20px;">
           ${Icons.shieldLock}
         </div>
-        <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">Private Audio Vault</h1>
-        <p style="font-size: 14px; color: var(--hint-color); line-height: 1.6; max-width: 300px; margin-bottom: 20px;">
-          This audio vault is configured exclusively for its owner and is completely private.
+        <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">Telegram Music</h1>
+        <p style="font-size: 14px; color: var(--hint-color); line-height: 1.6; max-width: 320px; margin-bottom: 20px;">
+          لطفاً این برنامه را از طریق تلگرام با فشردن دکمه منو یا استارت ربات باز کنید تا به آرشیو موسیقی دسترسی داشته باشید.
         </p>
         <div style="font-size: 11px; padding: 6px 12px; border-radius: 8px; background: var(--secondary-bg-color); color: var(--hint-color);">
           ${window.UI.escapeHTML(reason || 'Unauthorized')}

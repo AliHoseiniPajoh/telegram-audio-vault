@@ -2,71 +2,67 @@ const crypto = require('crypto');
 const { config } = require('../config');
 
 /**
- * Validates Telegram Mini App initData according to official Telegram specs:
- * https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
- *
- * @param {string} initData - Raw initData string from window.Telegram.WebApp.initData
- * @param {string} botToken - Telegram Bot Token
- * @param {number} maxAgeSeconds - Maximum allowed age in seconds (default: 86400 / 24 hours)
- * @returns {{ valid: boolean, user?: object, reason?: string }}
+ * Validates Telegram WebApp initData cryptographic signature (HMAC-SHA256).
+ * Ensures request genuinely originated from Telegram WebApp client.
  */
-function verifyTelegramWebAppData(initData, botToken, maxAgeSeconds = 30 * 86400) {
-  if (!initData || typeof initData !== 'string') {
-    return { valid: false, reason: 'initData is missing or invalid' };
+function verifyTelegramWebAppData(initDataString, botToken, maxAgeSeconds = 86400) {
+  if (!initDataString || typeof initDataString !== 'string') {
+    return { valid: false, reason: 'Empty or non-string initData provided' };
+  }
+
+  if (!botToken || typeof botToken !== 'string') {
+    return { valid: false, reason: 'Bot token missing from server environment' };
   }
 
   try {
-    const searchParams = new URLSearchParams(initData);
-    const hash = searchParams.get('hash');
+    const urlParams = new URLSearchParams(initDataString);
+    const hash = urlParams.get('hash');
 
     if (!hash) {
-      return { valid: false, reason: 'Hash signature missing in initData' };
+      return { valid: false, reason: 'Missing hash parameter in initData' };
     }
 
-    // 1. Sort all keys alphabetically except 'hash'
-    const keys = [];
-    for (const [key] of searchParams.entries()) {
-      if (key !== 'hash') {
-        keys.push(key);
-      }
+    urlParams.delete('hash');
+
+    // Build data_check_string with alphabetically sorted key=value pairs
+    const pairs = [];
+    for (const [key, val] of urlParams.entries()) {
+      pairs.push(`${key}=${val}`);
     }
-    keys.sort();
+    pairs.sort();
+    const dataCheckString = pairs.join('\n');
 
-    // 2. Build data_check_string: "key=value\nkey=value..."
-    const dataCheckString = keys
-      .map((key) => `${key}=${searchParams.get(key)}`)
-      .join('\n');
-
-    // 3. Secret key = HMAC_SHA256("WebAppData", botToken)
+    // Generate secret_key = HMAC_SHA256("WebAppData", botToken)
     const secretKey = crypto
       .createHmac('sha256', 'WebAppData')
       .update(botToken)
       .digest();
 
-    // 4. Calculate HMAC_SHA256(secretKey, dataCheckString)
+    // Calculate expected hash = HMAC_SHA256(secretKey, dataCheckString)
     const calculatedHash = crypto
       .createHmac('sha256', secretKey)
       .update(dataCheckString)
       .digest('hex');
 
-    // 5. Constant-time comparison to prevent timing attacks
-    const hashBuffer = Buffer.from(hash, 'hex');
-    const calculatedBuffer = Buffer.from(calculatedHash, 'hex');
-
-    if (hashBuffer.length !== calculatedBuffer.length || !crypto.timingSafeEqual(hashBuffer, calculatedBuffer)) {
-      return { valid: false, reason: 'Cryptographic signature mismatch' };
+    if (calculatedHash !== hash) {
+      return { valid: false, reason: 'Signature mismatch: hash does not match computed value' };
     }
 
-    // 6. Check auth_date expiration
-    const authDate = parseInt(searchParams.get('auth_date') || '0', 10);
-    const now = Math.floor(Date.now() / 1000);
-    if (now - authDate > maxAgeSeconds) {
-      return { valid: false, reason: 'initData has expired' };
+    // Expiry check
+    const authDateStr = urlParams.get('auth_date');
+    const authDate = parseInt(authDateStr, 10);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
+    if (!authDate || isNaN(authDate)) {
+      return { valid: false, reason: 'Missing or malformed auth_date' };
     }
 
-    // 7. Parse user object
-    const userJson = searchParams.get('user');
+    if (nowSeconds - authDate > maxAgeSeconds) {
+      return { valid: false, reason: `Authentication expired. Age: ${nowSeconds - authDate}s > ${maxAgeSeconds}s` };
+    }
+
     let user = null;
+    const userJson = urlParams.get('user');
     if (userJson) {
       user = JSON.parse(userJson);
     }
@@ -78,12 +74,15 @@ function verifyTelegramWebAppData(initData, botToken, maxAgeSeconds = 30 * 86400
 }
 
 /**
- * Express Middleware to enforce strict single-user whitelist
+ * Express Middleware:
+ * Validates Telegram initData cryptographic signature.
+ * Open to ALL valid Telegram users (no single-user blocking).
  */
 function telegramAuthMiddleware(req, res, next) {
-  // Allow bypassing in local dev testing ONLY if explicitly configured with mock user
+  // Allow bypassing in local dev testing if mock header sent
   if (config.nodeEnv === 'development' && req.headers['x-dev-mock-auth'] === 'owner') {
-    req.telegramUser = { id: config.allowedUserId, first_name: 'Dev Owner', username: 'dev_owner' };
+    req.telegramUser = { id: config.allowedUserId || 12345678, first_name: 'Dev User', username: 'dev_user' };
+    req.isOwner = true;
     return next();
   }
 
@@ -105,20 +104,12 @@ function telegramAuthMiddleware(req, res, next) {
     });
   }
 
-  // Strict User ID whitelist check
-  const userId = verification.user ? String(verification.user.id).trim() : null;
-  const allowedId = config.allowedUserId ? String(config.allowedUserId).trim().replace(/['"]/g, '') : null;
-
-  if (allowedId && (!userId || userId !== allowedId)) {
-    console.warn(`[Security Alert] Access denied for unauthorized user ID: ${userId}. Allowed: ${allowedId}`);
-    return res.status(403).json({
-      error: 'Forbidden',
-      message: `دسترسی غیرمجاز: شناسه کاربری ${userId} با شناسه مالک مطابقت ندارد.`
-    });
-  }
-
   // Attach verified user to request
-  req.telegramUser = verification.user;
+  req.telegramUser = verification.user || { id: 0, first_name: 'User' };
+  req.isOwner = config.allowedUserId
+    ? String(req.telegramUser.id).trim() === String(config.allowedUserId).trim()
+    : true;
+
   next();
 }
 

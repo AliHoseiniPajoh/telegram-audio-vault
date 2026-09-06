@@ -325,6 +325,8 @@ class Storage {
       fileSize: metadata.fileSize || 0,
       fileName: metadata.fileName || '',
       type: metadata.type || 'audio',
+      userId: metadata.userId || null,
+      userFirstName: metadata.userFirstName || null,
       createdAt: new Date().toISOString()
     };
 
@@ -390,18 +392,64 @@ class Storage {
 
   // --- Playlist Methods ---
 
-  async getAllPlaylists() {
+  async getAllPlaylists(userId = null) {
     await this.syncFromKV();
-    return (this.data.playlists || []).map((pl) => ({
-      ...pl,
-      name: pl.id === 'pl_favorites' ? 'موردعلاقه‌ها' : pl.name,
-      trackCount: (pl.trackIds || []).length
-    }));
+    const uid = userId ? String(userId).trim() : null;
+
+    // Resolve user-specific favorites playlist
+    const favPlId = uid ? `pl_fav_${uid}` : 'pl_favorites';
+    let userFav = (this.data.playlists || []).find((p) => p.id === favPlId);
+    if (!userFav && uid) {
+      userFav = {
+        id: favPlId,
+        name: 'Liked Songs',
+        isDefault: true,
+        userId: uid,
+        trackIds: [],
+        createdAt: new Date().toISOString()
+      };
+      this.data.playlists.push(userFav);
+      this.saveLocal();
+    }
+
+    const list = (this.data.playlists || []).filter((pl) => {
+      // Don't show other users' private favorites
+      if (pl.id.startsWith('pl_fav_') && pl.id !== favPlId) return false;
+      // Show user's playlists and public/general playlists
+      if (!pl.userId || !uid) return true;
+      return String(pl.userId).trim() === uid;
+    });
+
+    return list.map((pl) => {
+      const isFav = pl.id === favPlId || pl.id === 'pl_favorites';
+      return {
+        ...pl,
+        id: isFav ? 'pl_favorites' : pl.id, // Expose as pl_favorites so frontend UI works seamlessly
+        realId: pl.id,
+        name: isFav ? 'Liked Songs' : pl.name,
+        trackCount: (pl.trackIds || []).length
+      };
+    });
   }
 
-  async getPlaylistById(id) {
+  async getPlaylistById(id, userId = null) {
     await this.syncFromKV();
-    const pl = (this.data.playlists || []).find((p) => p.id === id);
+    const uid = userId ? String(userId).trim() : null;
+    const targetId = (id === 'pl_favorites' && uid) ? `pl_fav_${uid}` : id;
+
+    let pl = (this.data.playlists || []).find((p) => p.id === targetId || p.id === id);
+    if (!pl && id === 'pl_favorites' && uid) {
+      pl = {
+        id: `pl_fav_${uid}`,
+        name: 'Liked Songs',
+        isDefault: true,
+        userId: uid,
+        trackIds: [],
+        createdAt: new Date().toISOString()
+      };
+      this.data.playlists.push(pl);
+      this.saveLocal();
+    }
     if (!pl) return null;
 
     const tracks = (pl.trackIds || [])
@@ -410,12 +458,14 @@ class Storage {
 
     return {
       ...pl,
-      name: pl.id === 'pl_favorites' ? 'موردعلاقه‌ها' : pl.name,
+      id: 'pl_favorites',
+      realId: pl.id,
+      name: (pl.id === 'pl_favorites' || pl.id.startsWith('pl_fav_')) ? 'Liked Songs' : pl.name,
       tracks
     };
   }
 
-  async createPlaylist(name) {
+  async createPlaylist(name, userId = null) {
     if (!name || typeof name !== 'string') {
       throw new Error('Playlist name is required');
     }
@@ -424,6 +474,7 @@ class Storage {
       id: `pl_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       name: name.trim(),
       isDefault: false,
+      userId: userId ? String(userId).trim() : null,
       trackIds: [],
       createdAt: new Date().toISOString()
     };
@@ -448,9 +499,22 @@ class Storage {
     return true;
   }
 
-  async addTrackToPlaylist(playlistId, trackId) {
+  async addTrackToPlaylist(playlistId, trackId, userId = null) {
     await this.syncFromKV();
-    const pl = (this.data.playlists || []).find((p) => p.id === playlistId);
+    const uid = userId ? String(userId).trim() : null;
+    const targetId = (playlistId === 'pl_favorites' && uid) ? `pl_fav_${uid}` : playlistId;
+    let pl = (this.data.playlists || []).find((p) => p.id === targetId || p.id === playlistId);
+    if (!pl && playlistId === 'pl_favorites' && uid) {
+      pl = {
+        id: `pl_fav_${uid}`,
+        name: 'Liked Songs',
+        isDefault: true,
+        userId: uid,
+        trackIds: [],
+        createdAt: new Date().toISOString()
+      };
+      this.data.playlists.push(pl);
+    }
     if (!pl) throw new Error('Playlist not found');
 
     const track = (this.data.tracks || []).find((t) => t.id === trackId);
@@ -463,9 +527,11 @@ class Storage {
     return pl;
   }
 
-  async removeTrackFromPlaylist(playlistId, trackId) {
+  async removeTrackFromPlaylist(playlistId, trackId, userId = null) {
     await this.syncFromKV();
-    const pl = (this.data.playlists || []).find((p) => p.id === playlistId);
+    const uid = userId ? String(userId).trim() : null;
+    const targetId = (playlistId === 'pl_favorites' && uid) ? `pl_fav_${uid}` : playlistId;
+    const pl = (this.data.playlists || []).find((p) => p.id === targetId || p.id === playlistId);
     if (!pl) throw new Error('Playlist not found');
 
     pl.trackIds = (pl.trackIds || []).filter((tid) => tid !== trackId);
