@@ -131,10 +131,27 @@
   transition: transform var(--duration-sheet) var(--ease-out-expo);
   padding: calc(var(--sat) + 12px) 24px calc(var(--sab) + 24px) 24px;
   overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
 }
 
 .expanded-player.open {
   transform: translateY(0);
+}
+
+/* Dynamic Ambient Glow Backdrop */
+.ambient-glow {
+  position: absolute;
+  top: -15%;
+  left: -20%;
+  right: -20%;
+  height: 70%;
+  background: radial-gradient(circle at center, var(--ambient-glow-color, rgba(255, 45, 85, 0.28)) 0%, transparent 72%);
+  filter: blur(80px);
+  opacity: 0.65;
+  pointer-events: none;
+  z-index: 0;
+  transition: background 1.2s ease, opacity 0.8s ease;
 }
 
 /* Sheet Header & Drag Handle */
@@ -143,7 +160,8 @@
   flex-direction: column;
   align-items: center;
   position: relative;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  z-index: 2;
 }
 
 .drag-pill {
@@ -179,6 +197,13 @@
   min-height: 200px;
   max-height: 320px;
   margin-bottom: 24px;
+  position: relative;
+  z-index: 2;
+  transition: all var(--duration-normal) var(--ease-apple-spring);
+}
+
+.artwork-wrapper.hidden {
+  display: none;
 }
 
 .artwork-card {
@@ -193,12 +218,145 @@
   justify-content: center;
   color: var(--button-color);
   position: relative;
-  transition: transform 300ms ease;
+  overflow: hidden;
+  transition: transform 300ms ease, box-shadow 300ms ease;
+}
+
+.artwork-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 28px;
 }
 
 .artwork-card.playing {
   transform: scale(1.03);
   box-shadow: var(--glow-accent), 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+/* Synced Lyrics Container (Apple Music Style) */
+.lyrics-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
+  max-height: 320px;
+  margin-bottom: 24px;
+  background: rgba(28, 28, 30, 0.42);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 14px 16px;
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  animation: fadeInLyrics 0.28s var(--ease-apple-spring);
+}
+
+.lyrics-wrapper.hidden {
+  display: none;
+}
+
+@keyframes fadeInLyrics {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.lyrics-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.lyrics-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--apple-music-pink);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(255, 45, 85, 0.12);
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 0.5px solid rgba(255, 45, 85, 0.2);
+}
+
+.lyrics-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--apple-label-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-apple-spring);
+}
+
+.lyrics-close-btn:active {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(0.9);
+}
+
+.lyrics-scroller {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  scrollbar-width: none;
+}
+
+.lyrics-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.lyrics-list {
+  padding: 48px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.lyric-line {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: right;
+  direction: rtl;
+  cursor: pointer;
+  transition: all 260ms ease;
+  filter: blur(0.35px);
+  user-select: none;
+}
+
+.lyric-line:active {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.lyric-line.active {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.45);
+  filter: none;
+  transform: scale(1.03);
+  transform-origin: right center;
+}
+
+.lyric-empty {
+  text-align: center;
+  color: var(--apple-label-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: auto;
+  padding: 40px 10px;
 }
 
 /* Animated Soundwave Visualizer Bars */
@@ -369,16 +527,25 @@
   transform: scale(0.92);
 }
 
-/* Action Strip (Speed, Playlist) */
+/* Action Strip (Speed, Lyrics, Sleep, Playlist, Download) */
 .action-strip {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0 10px 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  width: 100%;
+}
+
+.action-strip::-webkit-scrollbar {
+  display: none;
 }
 
 .chip-btn {
-  padding: 8px 16px;
+  padding: 8px 14px;
   border-radius: 20px;
   background: var(--secondary-bg-color);
   border: 1px solid var(--glass-border);
@@ -388,10 +555,27 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: all var(--duration-fast) var(--ease-apple-spring);
 }
 
 .chip-btn:active {
   background: var(--card-active);
+  transform: scale(0.96);
+}
+
+.chip-btn.active {
+  background: rgba(255, 45, 85, 0.16);
+  border-color: var(--apple-music-pink);
+  color: var(--apple-music-pink);
+}
+
+.chip-btn.timer-active {
+  background: rgba(10, 132, 255, 0.16);
+  border-color: var(--apple-blue);
+  color: var(--apple-blue);
+  box-shadow: 0 0 12px rgba(10, 132, 255, 0.3);
 }
 
 .chip-btn.downloaded {

@@ -112,6 +112,18 @@ const ApiClient = {
     return this.request(`/tracks/${trackId}/play-native`, {
       method: 'POST'
     });
+  },
+
+  // Get synced LRC or plain lyrics for a track
+  async getLyrics(title, artist) {
+    const q = new URLSearchParams({ title: title || '', artist: artist || '' });
+    return this.request(`/lyrics?${q.toString()}`);
+  },
+
+  // Get high-res 600x600 album artwork
+  async getArtwork(title, artist) {
+    const q = new URLSearchParams({ title: title || '', artist: artist || '' });
+    return this.request(`/artwork?${q.toString()}`);
   }
 };
 

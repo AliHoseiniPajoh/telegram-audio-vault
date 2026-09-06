@@ -170,11 +170,122 @@ function initBot() {
     return true;
   }
 
-  // 1. Private Chat: audio, voice, document, or text
+  // Helper to extract & download music from external links (YouTube, SoundCloud, Spotify)
+  async function handleExternalMusicLink(ctx, text) {
+    if (!text || typeof text !== 'string') return false;
+    const urlMatch = text.match(/https?:\/\/[^\s]+/i);
+    if (!urlMatch) return false;
+    const url = urlMatch[0];
+
+    const isYouTube = /(?:youtube\.com|youtu\.be)/i.test(url);
+    const isSoundCloud = /soundcloud\.com/i.test(url);
+    const isSpotify = /open\.spotify\.com\/track/i.test(url);
+
+    if (!isYouTube && !isSoundCloud && !isSpotify) {
+      return false;
+    }
+
+    const platformName = isYouTube ? 'یوتیوب (YouTube)' : isSoundCloud ? 'ساندکلاد (SoundCloud)' : 'اسپاتیفای (Spotify)';
+    const statusMsg = await ctx.reply(`🔍 در حال دریافت و استخراج فایل صوتی از ${platformName}... لطفاً چند لحظه صبر کنید.`);
+
+    try {
+      let targetUrl = url;
+      let trackTitle = 'موزیک آنلاین';
+      let trackArtist = platformName;
+
+      // Handle Spotify: resolve metadata via oEmbed
+      if (isSpotify) {
+        try {
+          const oembedRes = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
+          if (oembedRes.ok) {
+            const spData = await oembedRes.json();
+            if (spData.title) trackTitle = spData.title;
+            if (spData.author_name) trackArtist = spData.author_name;
+          }
+        } catch (_) {}
+      }
+
+      // Query Cobalt API instances for direct audio download stream
+      const cobaltInstances = [
+        'https://api.cobalt.tools/api/json',
+        'https://cobalt.api.sc-0.fun/api/json',
+        'https://api.wuk.sh/api/json'
+      ];
+
+      let audioStreamUrl = null;
+      for (const instance of cobaltInstances) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 8000);
+          const cRes = await fetch(instance, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0'
+            },
+            body: JSON.stringify({
+              url: targetUrl,
+              downloadMode: 'audio',
+              audioFormat: 'mp3'
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(timer);
+
+          if (cRes.ok) {
+            const data = await cRes.json();
+            if (data.url) {
+              audioStreamUrl = data.url;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!audioStreamUrl) {
+        throw new Error('سرور مبدل در دسترس نبود یا لینک محافظت‌شده است.');
+      }
+
+      // Reply with audio to Telegram - Telegram Cloud CDN will ingest it
+      await ctx.replyWithAudio(
+        { url: audioStreamUrl, filename: `${trackTitle}.mp3` },
+        {
+          title: trackTitle,
+          performer: trackArtist,
+          caption: `📥 دانلود خودکار از ${platformName}`
+        }
+      );
+
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
+      } catch (_) {}
+
+      return true;
+    } catch (err) {
+      console.error('[External Link Error]', err.message);
+      try {
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          statusMsg.message_id,
+          undefined,
+          `⚠️ خطا در استخراج صوت از لینک: ${err.message}\n💡 لطفاً فایل موزیک را مستقیماً یا به صورت فوروارد ارسال کنید.`
+        );
+      } catch (_) {}
+      return true;
+    }
+  }
+
+  // 1. Private Chat: audio, voice, document, external links, or text
   bot.on('message', async (ctx) => {
     if (!ctx.message) return;
     const handled = await processIncomingMedia(ctx, ctx.message);
-    if (!handled && ctx.chat?.type === 'private' && !ctx.message.text?.startsWith('/')) {
+    if (handled) return;
+
+    if (ctx.chat?.type === 'private' && ctx.message.text && !ctx.message.text.startsWith('/')) {
+      const linkHandled = await handleExternalMusicLink(ctx, ctx.message.text);
+      if (linkHandled) return;
+
       const webAppUrl = getValidWebAppUrl();
       const buttons = [];
       if (webAppUrl) {
@@ -182,7 +293,7 @@ function initBot() {
       }
 
       await ctx.reply(
-        '💡 برای افزودن موزیک به کتابخانه، لطفاً یک فایل صوتی (MP3, M4A, FLAC, ...) یا وویس ارسال یا فوروارد کنید.',
+        '💡 برای افزودن موزیک به کتابخانه، لطفاً یک فایل صوتی (MP3, M4A, FLAC, ...) یا وویس ارسال کنید، یا لینک SoundCloud / YouTube / Spotify بفرستید.',
         buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined
       );
     }

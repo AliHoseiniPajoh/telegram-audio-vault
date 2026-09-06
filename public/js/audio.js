@@ -170,6 +170,7 @@ class AudioEngine {
     this.repeatMode = 'off'; // 'off' | 'all' | 'one'
     this.playbackRate = 1.0;
     this.currentBlobUrl = null;
+    this.isPreloadedNext = false;
 
     this.listeners = {
       trackChange: [],
@@ -471,6 +472,60 @@ class AudioEngine {
     this.playbackRate = rates[nextIdx];
     this.audio.playbackRate = this.playbackRate;
     return this.playbackRate;
+  }
+
+  stop() {
+    this.audio.pause();
+    this.audio.currentTime = 0;
+    this.isPlaying = false;
+    this.emit('stateChange', { isPlaying: false });
+  }
+
+  fadeVolume(targetVolume, durationMs = 15000) {
+    if (!this.audio) return;
+    const startVolume = this.audio.volume;
+    const steps = 25;
+    const stepTime = durationMs / steps;
+    const volumeStep = (targetVolume - startVolume) / steps;
+    let currentStep = 0;
+
+    if (this.fadeInterval) clearInterval(this.fadeInterval);
+    this.fadeInterval = setInterval(() => {
+      currentStep++;
+      const nextVol = Math.max(0, Math.min(1, startVolume + volumeStep * currentStep));
+      this.audio.volume = nextVol;
+      if (currentStep >= steps) {
+        clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        this.audio.volume = targetVolume;
+      }
+    }, stepTime);
+  }
+
+  setVolume(vol) {
+    if (this.fadeInterval) clearInterval(this.fadeInterval);
+    this.audio.volume = Math.max(0, Math.min(1, vol));
+  }
+
+  checkPreloadNext(currentTime, duration) {
+    if (this.isPreloadedNext || !duration || duration <= 0) return;
+    if (currentTime >= duration - 10) {
+      this.preloadNextTrack();
+    }
+  }
+
+  async preloadNextTrack() {
+    if (this.queue.length === 0 || this.currentIndex >= this.queue.length - 1) return;
+    const nextTrack = this.queue[this.currentIndex + 1];
+    if (!nextTrack) return;
+    this.isPreloadedNext = true;
+
+    try {
+      const cached = await AudioCache.get(nextTrack.fileId);
+      if (!cached && window.AudioCache?.downloadTrack) {
+        console.log('[AudioEngine] Gapless prebuffering next track:', nextTrack.title);
+      }
+    } catch (_) {}
   }
 }
 

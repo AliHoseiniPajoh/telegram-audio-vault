@@ -78,6 +78,104 @@ router.get('/tracks/:id', async (req, res) => {
   res.json({ track });
 });
 
+// --- Synced Lyrics Endpoint (via LRCLIB) ---
+router.get('/lyrics', async (req, res) => {
+  const { title, artist, duration } = req.query;
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+
+  const cleanTitle = title.replace(/\(.*?\)|\[.*?\]|\b(320|128|remix|feat|ft)\b/gi, '').trim();
+  const cleanArtist = (artist || '').replace(/\(.*?\)|\[.*?\]/gi, '').trim();
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+
+    const params = new URLSearchParams({
+      track_name: cleanTitle,
+      artist_name: cleanArtist
+    });
+    if (duration && parseInt(duration, 10) > 0) {
+      params.append('duration', parseInt(duration, 10).toString());
+    }
+
+    let lrcRes = await fetch(`https://lrclib.net/api/get?${params.toString()}`, {
+      headers: { 'User-Agent': 'TelegramAudioVault/1.0' },
+      signal: controller.signal
+    });
+
+    let data = null;
+    if (lrcRes.ok) {
+      data = await lrcRes.json();
+    } else {
+      const searchRes = await fetch(
+        `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle + ' ' + cleanArtist)}`,
+        {
+          headers: { 'User-Agent': 'TelegramAudioVault/1.0' },
+          signal: controller.signal
+        }
+      );
+      if (searchRes.ok) {
+        const searchResults = await searchRes.json();
+        if (Array.isArray(searchResults) && searchResults.length > 0) {
+          data = searchResults[0];
+        }
+      }
+    }
+    clearTimeout(timeout);
+
+    if (data && (data.syncedLyrics || data.plainLyrics)) {
+      return res.json({
+        syncedLyrics: data.syncedLyrics || null,
+        plainLyrics: data.plainLyrics || null,
+        trackName: data.trackName || cleanTitle,
+        artistName: data.artistName || cleanArtist
+      });
+    }
+
+    res.json({ syncedLyrics: null, plainLyrics: null });
+  } catch (err) {
+    console.warn('[Lyrics API Warning]', err.message);
+    res.json({ syncedLyrics: null, plainLyrics: null });
+  }
+});
+
+// --- High-Res Artwork Endpoint (via iTunes Search API) ---
+router.get('/artwork', async (req, res) => {
+  const { title, artist } = req.query;
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+
+  const cleanTitle = title.replace(/\(.*?\)|\[.*?\]/gi, '').trim();
+  const cleanArtist = (artist || '').replace(/\(.*?\)|\[.*?\]/gi, '').trim();
+  const term = `${cleanTitle} ${cleanArtist}`.trim();
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    const itunesRes = await fetch(
+      `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=1`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+
+    if (itunesRes.ok) {
+      const data = await itunesRes.json();
+      if (data.results && data.results.length > 0 && data.results[0].artworkUrl100) {
+        const highRes = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+        return res.json({ artworkUrl: highRes });
+      }
+    }
+    res.json({ artworkUrl: null });
+  } catch (err) {
+    console.warn('[Artwork API Warning]', err.message);
+    res.json({ artworkUrl: null });
+  }
+});
+
 // Delete a track
 router.delete('/tracks/:id', async (req, res) => {
   const success = await storage.deleteTrack(req.params.id);

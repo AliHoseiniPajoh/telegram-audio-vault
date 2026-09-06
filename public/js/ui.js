@@ -9,6 +9,18 @@ const UI = {
   isExpandedOpen: false,
   downloadedFileIds: new Set(),
 
+  // Synced Lyrics state
+  isLyricsOpen: false,
+  currentLyrics: null,
+  activeLyricIndex: -1,
+
+  // Sleep Timer state
+  sleepTimerTimeout: null,
+  sleepFadeTimeout: null,
+  sleepTimerInterval: null,
+  sleepTimerEndTime: null,
+  sleepTimerMode: null,
+
   // Initialize UI references and event hooks
   init() {
     this.bindDOM();
@@ -47,7 +59,9 @@ const UI = {
       // Expanded Player
       expandedPlayer: document.getElementById('expanded-player'),
       expandedCloseBtn: document.getElementById('expanded-close-btn'),
+      artworkWrapper: document.getElementById('artwork-wrapper'),
       artworkCard: document.getElementById('artwork-card'),
+      ambientGlow: document.getElementById('ambient-glow'),
       expandedTitle: document.getElementById('expanded-title'),
       expandedArtist: document.getElementById('expanded-artist'),
       seekSlider: document.getElementById('seek-slider'),
@@ -64,6 +78,17 @@ const UI = {
       btnDownloadExpanded: document.getElementById('btn-download-expanded'),
       btnPlayNative: document.getElementById('btn-play-native'),
       btnAddToPl: document.getElementById('btn-add-to-pl'),
+
+      // Lyrics elements
+      lyricsWrapper: document.getElementById('lyrics-wrapper'),
+      lyricsScroller: document.getElementById('lyrics-scroller'),
+      lyricsList: document.getElementById('lyrics-list'),
+      btnCloseLyrics: document.getElementById('btn-close-lyrics'),
+      btnLyrics: document.getElementById('btn-lyrics'),
+
+      // Sleep Timer elements
+      btnSleep: document.getElementById('btn-sleep'),
+      btnSleepText: document.getElementById('btn-sleep-text'),
 
       // Modals & Toast
       modalOverlay: document.getElementById('modal-overlay'),
@@ -251,6 +276,29 @@ const UI = {
       });
     }
 
+    // Synced Lyrics Toggle
+    if (this.dom.btnLyrics) {
+      this.dom.btnLyrics.addEventListener('click', () => {
+        window.TelegramBridge.haptic.impact('light');
+        this.toggleLyrics();
+      });
+    }
+
+    if (this.dom.btnCloseLyrics) {
+      this.dom.btnCloseLyrics.addEventListener('click', () => {
+        window.TelegramBridge.haptic.impact('light');
+        this.closeLyrics();
+      });
+    }
+
+    // Sleep Timer
+    if (this.dom.btnSleep) {
+      this.dom.btnSleep.addEventListener('click', () => {
+        window.TelegramBridge.haptic.impact('light');
+        this.openSleepTimerModal();
+      });
+    }
+
     // Seek Slider
     let isSeeking = false;
     this.dom.seekSlider.addEventListener('input', (e) => {
@@ -329,33 +377,44 @@ const UI = {
   onTrackChange(track) {
     if (!track) return;
 
-    // Show Mini Player
+    // 1. Record play history for Smart Playlists
+    this.recordTrackPlay(track);
+
+    // 2. Show Mini Player
     this.dom.miniPlayer.classList.remove('hidden');
     this.dom.miniTitle.textContent = track.title;
     this.dom.miniArtist.textContent = track.performer;
 
-    // Mini Artwork icon (voice vs audio)
-    this.dom.miniArtwork.innerHTML = track.type === 'voice' ? Icons.mic : Icons.musicNote;
+    // 3. Load High-Res Album Artwork & Dynamic Ambient Glow
+    this.loadArtworkAndAmbience(track);
 
-    // Expanded Player
+    // 4. Expanded Player
     this.dom.expandedTitle.textContent = track.title;
     this.dom.expandedArtist.textContent = track.performer;
     this.dom.seekSlider.value = 0;
     this.dom.currentTimeLabel.textContent = '0:00';
     this.dom.totalTimeLabel.textContent = this.formatTime(track.duration || 0);
 
-    // Update highlight in list
+    // 5. Update highlight in list
     document.querySelectorAll('.track-item').forEach((el) => {
       el.classList.toggle('playing', el.dataset.id === track.id);
     });
 
-    // Update Like button state
+    // 6. Update Like button state
     const favPl = (window.App.playlists || []).find((p) => p.id === 'pl_favorites');
     const isLiked = favPl && Array.isArray(favPl.trackIds) && favPl.trackIds.includes(track.id);
     this.updateLikeButton(isLiked);
 
-    // Update Download button state in expanded player
+    // 7. Update Download button state in expanded player
     this.updateExpandedDownloadBtn();
+
+    // 8. If lyrics panel is open, refresh lyrics for current track
+    if (this.isLyricsOpen) {
+      this.fetchAndRenderLyrics(track);
+    } else {
+      this.currentLyrics = null;
+      this.activeLyricIndex = -1;
+    }
   },
 
   onBuffering(isBuffering) {
@@ -388,6 +447,21 @@ const UI = {
     this.dom.currentTimeLabel.textContent = this.formatTime(currentTime);
     if (duration > 0) {
       this.dom.totalTimeLabel.textContent = this.formatTime(duration);
+    }
+
+    // Real-time synced lyrics highlight & auto-scroll
+    if (this.isLyricsOpen) {
+      this.syncLyricsTime(currentTime);
+    }
+
+    // End-of-track sleep timer check
+    if (this.sleepTimerMode === 'end_of_track' && duration > 0 && currentTime >= duration - 1.5) {
+      this.triggerSleepTimerEnd();
+    }
+
+    // Gapless prebuffering
+    if (window.AudioEngine?.checkPreloadNext) {
+      window.AudioEngine.checkPreloadNext(currentTime, duration);
     }
   },
 
@@ -592,6 +666,9 @@ const UI = {
       const favIcon = isLiked ? Icons.heart : Icons.heartOutline;
       const favTitle = isLiked ? 'حذف از موردعلاقه‌ها' : 'افزودن به موردعلاقه‌ها';
 
+      const isLargeFile = track.fileSize && track.fileSize > 20 * 1024 * 1024;
+      const sizeBadge = isLargeFile ? `<span class="badge-large-file" title="فایل با حجم بالای ۲۰ مگابایت">>۲۰ مگابایت</span>` : '';
+
       return `
         <div class="track-item ${isPlayingThis ? 'playing' : ''}" data-id="${track.id}" data-index="${idx}">
           <div class="track-artwork-badge">${icon}</div>
@@ -601,6 +678,7 @@ const UI = {
               <span>${this.escapeHTML(track.performer)}</span>
               <span class="dot-sep">•</span>
               <span>${durationStr}</span>
+              ${sizeBadge}
             </div>
           </div>
           <div class="track-actions">
@@ -625,9 +703,22 @@ const UI = {
 
     // Bind item clicks
     this.dom.contentView.querySelectorAll('.track-item').forEach((item) => {
-      item.addEventListener('click', (e) => {
+      item.addEventListener('click', async (e) => {
         if (e.target.closest('.track-actions')) return;
         const index = parseInt(item.dataset.index, 10);
+        const clickedTrack = tracks[index];
+
+        // Telegram Bot API restriction: cannot download >20MB via getFile.
+        // Automatically guide user to Telegram native player which has 2000MB cloud support!
+        if (clickedTrack && clickedTrack.fileSize > 20 * 1024 * 1024) {
+          window.TelegramBridge.haptic.impact('medium');
+          this.showToast('⚡ حجم فایل بالای ۲۰ مگابایت است؛ مستقیماً در تلگرام باز شد.');
+          try {
+            await window.ApiClient.playNative(clickedTrack.id);
+          } catch (_) {}
+          return;
+        }
+
         window.TelegramBridge.haptic.impact('light');
         window.AudioEngine.setQueue(tracks, index, true);
       });
@@ -719,7 +810,35 @@ const UI = {
 
   // Render Playlists Grid
   renderPlaylists(playlists) {
+    const recents = this.getRecentlyPlayedTracks();
+    const mosts = this.getMostPlayedTracks();
+    const news = this.getRecentlyAddedTracks();
+
+    const smartSectionHtml = `
+      <div class="smart-playlists-section">
+        <div class="smart-section-title">پلی‌لیست‌های هوشمند خودکار</div>
+        <div class="smart-playlists-row">
+          <div class="smart-card recently-played" id="smart-card-recent">
+            <div class="smart-card-icon">${Icons.clock}</div>
+            <div class="smart-card-title">اخیراً پخش‌شده</div>
+            <div class="smart-card-sub">${recents.length} ترَک</div>
+          </div>
+          <div class="smart-card most-played" id="smart-card-most">
+            <div class="smart-card-icon">${Icons.fire}</div>
+            <div class="smart-card-title">بیشترین پخش</div>
+            <div class="smart-card-sub">${mosts.length} ترَک</div>
+          </div>
+          <div class="smart-card recently-added" id="smart-card-new">
+            <div class="smart-card-icon">${Icons.sparkles}</div>
+            <div class="smart-card-title">تازه‌ترین‌ها</div>
+            <div class="smart-card-sub">${news.length} ترَک</div>
+          </div>
+        </div>
+      </div>
+    `;
+
     const headerHtml = `
+      ${smartSectionHtml}
       <div class="playlist-header-row">
         <span style="font-weight: 700; font-size: 16px;">پلی‌لیست‌های شخصی</span>
         <button class="chip-btn" id="btn-create-pl">
@@ -752,6 +871,37 @@ const UI = {
       this.dom.contentView.innerHTML = `${headerHtml}<div class="playlist-grid">${cards}</div>`;
     }
 
+    // Bind Smart Playlists Clicks
+    document.getElementById('smart-card-recent')?.addEventListener('click', () => {
+      window.TelegramBridge.haptic.impact('light');
+      this.renderPlaylistDetail({
+        id: 'smart_recent',
+        name: '🕒 اخیراً پخش‌شده',
+        isDefault: true,
+        tracks: this.getRecentlyPlayedTracks()
+      });
+    });
+
+    document.getElementById('smart-card-most')?.addEventListener('click', () => {
+      window.TelegramBridge.haptic.impact('light');
+      this.renderPlaylistDetail({
+        id: 'smart_most',
+        name: '🔥 بیشترین پخش',
+        isDefault: true,
+        tracks: this.getMostPlayedTracks()
+      });
+    });
+
+    document.getElementById('smart-card-new')?.addEventListener('click', () => {
+      window.TelegramBridge.haptic.impact('light');
+      this.renderPlaylistDetail({
+        id: 'smart_new',
+        name: '✨ تازه‌ترین‌ها',
+        isDefault: true,
+        tracks: this.getRecentlyAddedTracks()
+      });
+    });
+
     // Bind Create Playlist
     document.getElementById('btn-create-pl')?.addEventListener('click', () => {
       window.TelegramBridge.haptic.impact('light');
@@ -770,6 +920,7 @@ const UI = {
   // Render Playlist Detail View
   renderPlaylistDetail(playlist) {
     this.activePlaylistId = playlist.id;
+    const isSmartPlaylist = String(playlist.id).startsWith('smart_');
 
     const detailHeader = `
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
@@ -778,7 +929,7 @@ const UI = {
           <h2 style="font-size: 18px; font-weight: 700;">${this.escapeHTML(playlist.name)}</h2>
           <span style="font-size: 12px; color: var(--hint-color);">${playlist.tracks.length} ترَک</span>
         </div>
-        ${!playlist.isDefault ? `
+        ${(!playlist.isDefault && !isSmartPlaylist) ? `
           <button class="icon-btn" id="pl-delete-btn" style="color: var(--destructive-color);" title="حذف پلی‌لیست">
             ${Icons.trash}
           </button>
@@ -793,9 +944,11 @@ const UI = {
       this.switchTab('playlists');
     });
 
-    document.getElementById('pl-delete-btn')?.addEventListener('click', () => {
-      this.confirmDeletePlaylist(playlist.id);
-    });
+    if (!playlist.isDefault && !isSmartPlaylist) {
+      document.getElementById('pl-delete-btn')?.addEventListener('click', () => {
+        this.confirmDeletePlaylist(playlist.id);
+      });
+    }
 
     // Telegram Back button triggers back to playlists
     window.TelegramBridge.backButton.show(() => {
@@ -809,7 +962,7 @@ const UI = {
         <div class="empty-state">
           <div class="empty-icon">${Icons.musicNote}</div>
           <div class="empty-title">این پلی‌لیست خالی است</div>
-          <div class="empty-desc">از تب «همه فایل‌ها»، روی علامت + کنار ترک‌ها کلیک کنید تا به اینجا اضافه شوند.</div>
+          <div class="empty-desc">ترکی در این پلی‌لیست وجود ندارد.</div>
         </div>
       `;
     } else {
@@ -819,6 +972,9 @@ const UI = {
         const dlClass = isDownloaded ? 'downloaded' : '';
         const dlTitle = isDownloaded ? 'ذخیره شده در حافظه گوشی (پخش آفلاین)' : 'دانلود و ذخیره دائمی در حافظه گوشی';
 
+        const isLargeFile = track.fileSize && track.fileSize > 20 * 1024 * 1024;
+        const sizeBadge = isLargeFile ? `<span class="badge-large-file" title="فایل با حجم بالای ۲۰ مگابایت">>۲۰ مگابایت</span>` : '';
+
         return `
           <div class="track-item" data-id="${track.id}" data-index="${idx}">
             <div class="track-artwork-badge">${track.type === 'voice' ? Icons.mic : Icons.musicNote}</div>
@@ -826,8 +982,9 @@ const UI = {
               <div class="track-name">${this.escapeHTML(track.title)}</div>
               <div class="track-sub">
                 <span>${this.escapeHTML(track.performer)}</span>
-                <span>•</span>
+                <span class="dot-sep">•</span>
                 <span>${this.formatTime(track.duration)}</span>
+                ${sizeBadge}
               </div>
             </div>
             <div class="track-actions">
@@ -837,9 +994,11 @@ const UI = {
               <button class="track-action-btn play-native" data-id="${track.id}" title="ارسال به چت تلگرام (پخش فوری در پلیر تلگرام بدون دانلود)">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
               </button>
-              <button class="track-action-btn pl-remove-track" data-track-id="${track.id}" title="حذف از پلی‌لیست">
-                ${Icons.close}
-              </button>
+              ${!isSmartPlaylist ? `
+                <button class="track-action-btn pl-remove-track" data-track-id="${track.id}" title="حذف از پلی‌لیست">
+                  ${Icons.close}
+                </button>
+              ` : ''}
             </div>
           </div>
         `;
@@ -849,9 +1008,20 @@ const UI = {
 
       // Click to play from playlist queue
       tracksContainer.querySelectorAll('.track-item').forEach((item) => {
-        item.addEventListener('click', (e) => {
+        item.addEventListener('click', async (e) => {
           if (e.target.closest('.track-actions')) return;
           const index = parseInt(item.dataset.index, 10);
+          const clickedTrack = playlist.tracks[index];
+
+          if (clickedTrack && clickedTrack.fileSize > 20 * 1024 * 1024) {
+            window.TelegramBridge.haptic.impact('medium');
+            this.showToast('⚡ حجم فایل بالای ۲۰ مگابایت است؛ مستقیماً در تلگرام باز شد.');
+            try {
+              await window.ApiClient.playNative(clickedTrack.id);
+            } catch (_) {}
+            return;
+          }
+
           window.TelegramBridge.haptic.impact('light');
           window.AudioEngine.setQueue(playlist.tracks, index, true);
         });
@@ -1108,6 +1278,400 @@ const UI = {
     const mins = Math.floor(s / 60);
     const remainingSecs = s % 60;
     return `${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
+  },
+
+  // --- Smart Dynamic Playlists Helpers ---
+
+  recordTrackPlay(track) {
+    if (!track || !track.id) return;
+    try {
+      // 1. Recently Played (keep last 40)
+      let recents = JSON.parse(localStorage.getItem('vault_recently_played') || '[]');
+      recents = [track.id, ...recents.filter((id) => id !== track.id)].slice(0, 40);
+      localStorage.setItem('vault_recently_played', JSON.stringify(recents));
+
+      // 2. Play Counts
+      const counts = JSON.parse(localStorage.getItem('vault_play_counts') || '{}');
+      counts[track.id] = (counts[track.id] || 0) + 1;
+      localStorage.setItem('vault_play_counts', JSON.stringify(counts));
+    } catch (_) {}
+  },
+
+  getRecentlyPlayedTracks() {
+    try {
+      const ids = JSON.parse(localStorage.getItem('vault_recently_played') || '[]');
+      const allTracks = window.App.tracks || [];
+      const trackMap = new Map(allTracks.map((t) => [t.id, t]));
+      return ids.map((id) => trackMap.get(id)).filter(Boolean);
+    } catch (_) {
+      return [];
+    }
+  },
+
+  getMostPlayedTracks() {
+    try {
+      const counts = JSON.parse(localStorage.getItem('vault_play_counts') || '{}');
+      const allTracks = window.App.tracks || [];
+      return allTracks
+        .filter((t) => counts[t.id] > 0)
+        .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+    } catch (_) {
+      return [];
+    }
+  },
+
+  getRecentlyAddedTracks() {
+    const allTracks = [...(window.App.tracks || [])];
+    return allTracks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  },
+
+  // --- Dynamic Artwork & Ambient Glow Extraction ---
+
+  async loadArtworkAndAmbience(track) {
+    if (!track) return;
+
+    if (track.type === 'voice') {
+      this.dom.artworkCard.innerHTML = `
+        <div class="soundwave">
+          <div class="soundwave-bar"></div>
+          <div class="soundwave-bar"></div>
+          <div class="soundwave-bar"></div>
+          <div class="soundwave-bar"></div>
+          <div class="soundwave-bar"></div>
+        </div>
+      `;
+      this.dom.miniArtwork.innerHTML = Icons.mic;
+      if (this.dom.ambientGlow) {
+        this.dom.ambientGlow.style.background = 'radial-gradient(circle at center, rgba(10, 132, 255, 0.28) 0%, transparent 72%)';
+      }
+      return;
+    }
+
+    try {
+      const artData = await window.ApiClient.getArtwork(track.title, track.performer);
+      if (artData && artData.artworkUrl) {
+        const url = artData.artworkUrl;
+        this.dom.artworkCard.innerHTML = `<img src="${url}" alt="${this.escapeHTML(track.title)}" />`;
+        this.dom.miniArtwork.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />`;
+
+        // Extract vibrant ambient color using offscreen canvas
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 16;
+            canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, 16, 16);
+            const imgData = ctx.getImageData(0, 0, 16, 16).data;
+            let r = 0, g = 0, b = 0, count = 0;
+            for (let i = 0; i < imgData.length; i += 4) {
+              const br = (imgData[i] + imgData[i + 1] + imgData[i + 2]) / 3;
+              if (br > 25 && br < 235) {
+                r += imgData[i];
+                g += imgData[i + 1];
+                b += imgData[i + 2];
+                count++;
+              }
+            }
+            if (count > 0) {
+              r = Math.round(r / count);
+              g = Math.round(g / count);
+              b = Math.round(b / count);
+              if (this.dom.ambientGlow) {
+                this.dom.ambientGlow.style.background = `radial-gradient(circle at center, rgba(${r}, ${g}, ${b}, 0.48) 0%, transparent 72%)`;
+              }
+            }
+          } catch (_) {}
+        };
+        img.src = url;
+      } else {
+        // Fallback default
+        this.dom.artworkCard.innerHTML = `
+          <div class="soundwave">
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+          </div>
+        `;
+        this.dom.miniArtwork.innerHTML = Icons.musicNote;
+        if (this.dom.ambientGlow) {
+          this.dom.ambientGlow.style.background = 'radial-gradient(circle at center, rgba(255, 45, 85, 0.28) 0%, transparent 72%)';
+        }
+      }
+    } catch (_) {
+      this.dom.artworkCard.innerHTML = `
+        <div class="soundwave">
+          <div class="soundwave-bar"></div>
+          <div class="soundwave-bar"></div>
+          <div class="soundwave-bar"></div>
+          <div class="soundwave-bar"></div>
+          <div class="soundwave-bar"></div>
+        </div>
+      `;
+      this.dom.miniArtwork.innerHTML = Icons.musicNote;
+    }
+  },
+
+  // --- Synced Lyrics (Apple Music Style) ---
+
+  parseLRC(lrcText) {
+    if (!lrcText || typeof lrcText !== 'string') return null;
+    const lines = lrcText.split(/\r?\n/);
+    const parsed = [];
+    const timeReg = /\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]/g;
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const matches = [...line.matchAll(timeReg)];
+      if (matches.length > 0) {
+        const text = line.replace(timeReg, '').trim();
+        if (text) {
+          for (const m of matches) {
+            const mins = parseInt(m[1], 10);
+            const secs = parseInt(m[2], 10);
+            const millis = m[3] ? parseInt(m[3].padEnd(3, '0').slice(0, 3), 10) : 0;
+            const totalSecs = mins * 60 + secs + millis / 1000;
+            parsed.push({ time: totalSecs, text });
+          }
+        }
+      }
+    }
+
+    if (parsed.length === 0) return null;
+    return parsed.sort((a, b) => a.time - b.time);
+  },
+
+  toggleLyrics() {
+    if (this.isLyricsOpen) {
+      this.closeLyrics();
+    } else {
+      this.openLyrics();
+    }
+  },
+
+  openLyrics() {
+    this.isLyricsOpen = true;
+    if (this.dom.artworkWrapper) this.dom.artworkWrapper.classList.add('hidden');
+    if (this.dom.lyricsWrapper) this.dom.lyricsWrapper.classList.remove('hidden');
+    if (this.dom.btnLyrics) this.dom.btnLyrics.classList.add('active');
+
+    const cur = window.AudioEngine.getCurrentTrack();
+    if (cur) {
+      this.fetchAndRenderLyrics(cur);
+    }
+  },
+
+  closeLyrics() {
+    this.isLyricsOpen = false;
+    if (this.dom.artworkWrapper) this.dom.artworkWrapper.classList.remove('hidden');
+    if (this.dom.lyricsWrapper) this.dom.lyricsWrapper.classList.add('hidden');
+    if (this.dom.btnLyrics) this.dom.btnLyrics.classList.remove('active');
+  },
+
+  async fetchAndRenderLyrics(track) {
+    if (!track) return;
+    this.dom.lyricsList.innerHTML = `
+      <div class="lyric-empty">
+        <div style="margin-bottom: 10px;">${Icons.spinner}</div>
+        <div>در حال دریافت متن ترانه...</div>
+      </div>
+    `;
+
+    try {
+      const data = await window.ApiClient.getLyrics(track.title, track.performer);
+      if (!data || (!data.syncedLyrics && !data.plainLyrics)) {
+        this.dom.lyricsList.innerHTML = `<div class="lyric-empty">متن ترانه برای این آهنگ یافت نشد.</div>`;
+        this.currentLyrics = null;
+        return;
+      }
+
+      if (data.syncedLyrics) {
+        const parsed = this.parseLRC(data.syncedLyrics);
+        if (parsed && parsed.length > 0) {
+          this.currentLyrics = parsed;
+          this.activeLyricIndex = -1;
+          this.dom.lyricsList.innerHTML = parsed.map((item, idx) => `
+            <div class="lyric-line" data-index="${idx}" data-time="${item.time}">
+              ${this.escapeHTML(item.text)}
+            </div>
+          `).join('');
+
+          // Click to seek to lyric timestamp
+          this.dom.lyricsList.querySelectorAll('.lyric-line').forEach((el) => {
+            el.addEventListener('click', () => {
+              const time = parseFloat(el.dataset.time);
+              window.TelegramBridge.haptic.impact('light');
+              window.AudioEngine.seekToTime(time);
+            });
+          });
+
+          this.syncLyricsTime(window.AudioEngine.audio.currentTime || 0);
+          return;
+        }
+      }
+
+      // Plain lyrics fallback
+      if (data.plainLyrics) {
+        this.currentLyrics = null;
+        const plainLines = data.plainLyrics.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        this.dom.lyricsList.innerHTML = plainLines.map((l) => `
+          <div class="lyric-line" style="color: #ffffff; filter: none; opacity: 0.9; cursor: default;">
+            ${this.escapeHTML(l)}
+          </div>
+        `).join('');
+      }
+    } catch (_) {
+      this.dom.lyricsList.innerHTML = `<div class="lyric-empty">متن ترانه یافت نشد.</div>`;
+      this.currentLyrics = null;
+    }
+  },
+
+  syncLyricsTime(currentTime) {
+    if (!this.currentLyrics || this.currentLyrics.length === 0) return;
+
+    let targetIdx = -1;
+    for (let i = 0; i < this.currentLyrics.length; i++) {
+      if (this.currentLyrics[i].time <= currentTime + 0.25) {
+        targetIdx = i;
+      } else {
+        break;
+      }
+    }
+
+    if (targetIdx !== this.activeLyricIndex) {
+      this.activeLyricIndex = targetIdx;
+      const allLines = this.dom.lyricsList.querySelectorAll('.lyric-line');
+      allLines.forEach((el, idx) => {
+        el.classList.toggle('active', idx === targetIdx);
+      });
+
+      if (targetIdx >= 0 && allLines[targetIdx]) {
+        allLines[targetIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  },
+
+  // --- Smart Sleep Timer ---
+
+  openSleepTimerModal() {
+    const isRunning = !!this.sleepTimerEndTime || this.sleepTimerMode === 'end_of_track';
+    const body = `
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="timer-opt-btn" data-minutes="15">⏱️ ۱۵ دقیقه</button>
+        <button class="timer-opt-btn" data-minutes="30">⏱️ ۳۰ دقیقه</button>
+        <button class="timer-opt-btn" data-minutes="45">⏱️ ۴۵ دقیقه</button>
+        <button class="timer-opt-btn" data-minutes="60">⏱️ ۶۰ دقیقه (۱ ساعت)</button>
+        <button class="timer-opt-btn" data-mode="end_of_track">🎵 پایان آهنگ در حال پخش</button>
+        ${isRunning ? `<button class="timer-opt-btn" data-cancel="true" style="color: var(--apple-destructive); margin-top: 4px;">❌ خاموش کردن تایمر</button>` : ''}
+      </div>
+    `;
+
+    const actions = `<button class="btn-secondary" id="modal-cancel">انصراف</button>`;
+    this.openModal('تایمر خواب هوشمند', body, actions);
+    document.getElementById('modal-cancel').onclick = () => this.closeModal();
+
+    document.querySelectorAll('.timer-opt-btn').forEach((btn) => {
+      btn.onclick = () => {
+        window.TelegramBridge.haptic.impact('medium');
+        if (btn.dataset.cancel) {
+          this.cancelSleepTimer();
+          this.showToast('تایمر خواب خاموش شد');
+        } else if (btn.dataset.mode === 'end_of_track') {
+          this.startSleepTimerEndOfTrack();
+        } else if (btn.dataset.minutes) {
+          const mins = parseInt(btn.dataset.minutes, 10);
+          this.startSleepTimerMinutes(mins);
+        }
+        this.closeModal();
+      };
+    });
+  },
+
+  startSleepTimerMinutes(minutes) {
+    this.cancelSleepTimer();
+    const durationMs = minutes * 60 * 1000;
+    this.sleepTimerEndTime = Date.now() + durationMs;
+    this.sleepTimerMode = 'time';
+
+    if (this.dom.btnSleep) {
+      this.dom.btnSleep.classList.add('timer-active');
+    }
+
+    this.showToast(`🌙 تایمر خواب روی ${minutes} دقیقه تنظیم شد`);
+    this.updateSleepTimerBadge();
+
+    this.sleepTimerInterval = setInterval(() => {
+      this.updateSleepTimerBadge();
+    }, 1000);
+
+    // 25 seconds before timer end, fade volume down smoothly
+    const fadeStartMs = Math.max(0, durationMs - 25000);
+    this.sleepFadeTimeout = setTimeout(() => {
+      window.AudioEngine.fadeVolume(0, 24000);
+    }, fadeStartMs);
+
+    this.sleepTimerTimeout = setTimeout(() => {
+      this.triggerSleepTimerEnd();
+    }, durationMs);
+  },
+
+  startSleepTimerEndOfTrack() {
+    this.cancelSleepTimer();
+    this.sleepTimerMode = 'end_of_track';
+    if (this.dom.btnSleep) {
+      this.dom.btnSleep.classList.add('timer-active');
+    }
+    if (this.dom.btnSleepText) {
+      this.dom.btnSleepText.textContent = 'پایان آهنگ';
+    }
+    this.showToast('🌙 پخش در پایان این آهنگ متوقف خواهد شد');
+  },
+
+  updateSleepTimerBadge() {
+    if (!this.sleepTimerEndTime || this.sleepTimerMode !== 'time') return;
+    const remainingMs = this.sleepTimerEndTime - Date.now();
+    if (remainingMs <= 0) {
+      this.triggerSleepTimerEnd();
+      return;
+    }
+    const remainingSecs = Math.ceil(remainingMs / 1000);
+    const m = Math.floor(remainingSecs / 60);
+    const s = remainingSecs % 60;
+    const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`;
+    if (this.dom.btnSleepText) {
+      this.dom.btnSleepText.textContent = timeStr;
+    }
+  },
+
+  triggerSleepTimerEnd() {
+    this.cancelSleepTimer();
+    window.AudioEngine.stop();
+    window.AudioEngine.setVolume(1.0);
+    this.showToast('🌙 تایمر خواب فرا رسید؛ پخش متوقف شد.');
+    window.TelegramBridge.haptic.notification('success');
+  },
+
+  cancelSleepTimer() {
+    if (this.sleepTimerTimeout) clearTimeout(this.sleepTimerTimeout);
+    if (this.sleepFadeTimeout) clearTimeout(this.sleepFadeTimeout);
+    if (this.sleepTimerInterval) clearInterval(this.sleepTimerInterval);
+    this.sleepTimerTimeout = null;
+    this.sleepFadeTimeout = null;
+    this.sleepTimerInterval = null;
+    this.sleepTimerEndTime = null;
+    this.sleepTimerMode = null;
+
+    if (this.dom.btnSleep) {
+      this.dom.btnSleep.classList.remove('timer-active');
+    }
+    if (this.dom.btnSleepText) {
+      this.dom.btnSleepText.textContent = 'تایمر خواب';
+    }
   },
 
   escapeHTML(str = '') {

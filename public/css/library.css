@@ -189,12 +189,115 @@
   opacity: 0.5;
 }
 
+.badge-large-file {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #ff9f0a;
+  background: rgba(255, 159, 10, 0.14);
+  border: 0.5px solid rgba(255, 159, 10, 0.3);
+  border-radius: 5px;
+  padding: 1px 5px;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Apple Track Actions Toolbar */
 .track-actions {
   display: flex;
   align-items: center;
   gap: 5px;
   flex-shrink: 0;
+}
+
+/* Smart Dynamic Playlists */
+.smart-playlists-section {
+  margin-bottom: 20px;
+}
+
+.smart-section-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--apple-label-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.smart-playlists-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.smart-card {
+  background: rgba(255, 255, 255, 0.038);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-apple-spring);
+}
+
+.smart-card:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.smart-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.smart-card.recently-played .smart-card-icon {
+  background: linear-gradient(135deg, rgba(175, 82, 222, 0.25) 0%, rgba(175, 82, 222, 0.1) 100%);
+  color: #bf5af2;
+  border: 0.5px solid rgba(175, 82, 222, 0.3);
+}
+
+.smart-card.most-played .smart-card-icon {
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.25) 0%, rgba(255, 69, 58, 0.1) 100%);
+  color: #ff9f0a;
+  border: 0.5px solid rgba(255, 159, 10, 0.3);
+}
+
+.smart-card.recently-added .smart-card-icon {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.25) 0%, rgba(100, 210, 255, 0.1) 100%);
+  color: #64d2ff;
+  border: 0.5px solid rgba(10, 132, 255, 0.3);
+}
+
+.smart-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.smart-card-sub {
+  font-size: 10.5px;
+  color: var(--apple-label-secondary);
+  margin-top: 2px;
+}
+
+/* Apple Music Style Playlist Cards */
+.playlist-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 0 14px 0;
 }
 
 .track-action-btn {
@@ -469,6 +572,25 @@
   background: rgba(255, 255, 255, 0.12);
   border-color: var(--apple-blue);
   box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.25);
+}
+
+.timer-opt-btn {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-align: right;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-apple-spring);
+}
+
+.timer-opt-btn:active {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(0.98);
 }
 
 .modal-actions {
