@@ -670,7 +670,7 @@ const UI = {
   // SCREEN RENDERERS
   // =========================================================================
 
-  renderHomeScreen() {
+    renderHomeScreen() {
     const tracks = window.App.tracks || [];
 
     // Subtitle in Hero
@@ -679,54 +679,7 @@ const UI = {
       heroSub.textContent = tracks.length > 0 ? `${tracks.length} songs in vault` : 'All your music. Everywhere.';
     }
 
-    // 1. Recently Played Carousel
-    const recents = this.getRecentlyPlayedTracks();
-    const displayRecents = recents.length > 0 ? recents.slice(0, 10) : tracks.slice(0, 8);
-    const countEl = document.getElementById('home-recently-count');
-    if (countEl) countEl.textContent = `${displayRecents.length} tracks`;
-
-    const recentSection = document.getElementById('home-recently-section');
-    if (recentSection) {
-      recentSection.style.display = displayRecents.length > 0 ? 'block' : 'none';
-    }
-
-    const carouselEl = document.getElementById('home-recently-carousel');
-    if (carouselEl && displayRecents.length > 0) {
-      carouselEl.innerHTML = displayRecents.map((t, idx) => `
-        <div class="recently-card" data-id="${t.id}" data-index="${idx}">
-          <div class="recently-artwork" id="recent-art-${t.id}">
-            ${t.type === 'voice' ? Icons.mic : Icons.musicNote}
-          </div>
-          <div class="recently-title">${this.escapeHTML(t.title)}</div>
-          <div class="recently-artist">${this.escapeHTML(t.performer)}</div>
-        </div>
-      `).join('');
-
-      carouselEl.querySelectorAll('.recently-card').forEach((card) => {
-        card.addEventListener('click', () => {
-          const trackId = card.dataset.id;
-          const t = tracks.find((x) => x.id === trackId);
-          if (t) {
-            window.TelegramBridge.haptic.impact('light');
-            window.AudioEngine.setQueue([t, ...tracks.filter((x) => x.id !== trackId)], 0, true);
-          }
-        });
-      });
-
-      // Load covers async
-      displayRecents.forEach((t) => {
-        if (t.type !== 'voice') {
-          window.ApiClient.getArtwork(t.title, t.performer).then((res) => {
-            if (res && res.artworkUrl) {
-              const el = document.getElementById(`recent-art-${t.id}`);
-              if (el) el.innerHTML = `<img src="${res.artworkUrl}" alt="" />`;
-            }
-          }).catch(() => {});
-        }
-      });
-    }
-
-    // 2. Quick Access Counts
+    // 1. Quick Access Counts (۴ کاشی دسترسی سریع بالای صفحه)
     const favPl = (window.App.playlists || []).find((p) => p.id === 'pl_favorites');
     const likedCount = favPl && Array.isArray(favPl.trackIds) ? favPl.trackIds.length : 0;
     const qcLiked = document.getElementById('qc-liked-count');
@@ -737,7 +690,7 @@ const UI = {
 
     this.updateStorageStats();
 
-    // 3. Render ALL SONGS on Home Screen (صفحه اول تمام آهنگ‌ها)
+    // 2. Render ALL SONGS directly under the 4 Quick Access tiles (صفحه اول تمام آهنگ‌ها)
     const allTracksList = document.getElementById('home-all-tracks-list');
     const allTracksCount = document.getElementById('home-all-tracks-count');
     if (allTracksCount) allTracksCount.textContent = `(${tracks.length})`;
