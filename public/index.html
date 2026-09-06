@@ -41,29 +41,15 @@
           <div class="hero-content">
             <span class="hero-eyebrow">Good to hear you</span>
             <h1 class="hero-title">Play your world</h1>
-            <p class="hero-sub">All your music. Everywhere.</p>
+            <p class="hero-sub" id="home-hero-subtitle">All your music. Everywhere.</p>
           </div>
-          <button class="hero-play-fab" id="home-hero-play-btn" aria-label="Play All">
+          <button class="hero-play-fab" id="home-hero-play-btn" aria-label="Play All" title="Play All">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
           </button>
         </div>
 
-        <!-- Section: Recently Played Horizontal Carousel -->
-        <div class="section-container" id="home-recently-section">
-          <div class="section-header-row">
-            <h2 class="section-title">Recently Played</h2>
-            <span class="section-count" id="home-recently-count"></span>
-          </div>
-          <div class="horizontal-carousel" id="home-recently-carousel">
-            <!-- Populated dynamically -->
-          </div>
-        </div>
-
         <!-- Section: Quick Access 2x2 Grid -->
         <div class="section-container">
-          <div class="section-header-row">
-            <h2 class="section-title">Quick Access</h2>
-          </div>
           <div class="quick-access-grid">
             <div class="quick-card" id="qc-liked">
               <div class="quick-card-icon red">
@@ -107,13 +93,31 @@
           </div>
         </div>
 
-        <!-- Section: Made For You / Smart Playlists -->
-        <div class="section-container">
+        <!-- Section: Recently Played Horizontal Carousel -->
+        <div class="section-container" id="home-recently-section">
           <div class="section-header-row">
-            <h2 class="section-title">Made for You</h2>
+            <h2 class="section-title">Recently Played</h2>
+            <span class="section-count" id="home-recently-count"></span>
           </div>
-          <div class="mood-playlists-grid" id="home-mood-grid">
+          <div class="horizontal-carousel" id="home-recently-carousel">
             <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Section: ALL TRACKS (تمام آهنگ‌ها در صفحه اول) -->
+        <div class="section-container" id="home-all-tracks-section">
+          <div class="section-header-row" style="margin-bottom: 8px;">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <h2 class="section-title">All Songs</h2>
+              <span class="section-count" id="home-all-tracks-count"></span>
+            </div>
+            <button class="text-btn-action" id="btn-home-shuffle-all" style="display: flex; align-items: center; gap: 4px;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+              <span>Shuffle</span>
+            </button>
+          </div>
+          <div class="home-tracks-list" id="home-all-tracks-list" style="display: flex; flex-direction: column; gap: 4px; padding: 0 16px;">
+            <!-- All vault tracks rendered here -->
           </div>
         </div>
       </section>

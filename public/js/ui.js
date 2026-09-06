@@ -673,54 +673,57 @@ const UI = {
   renderHomeScreen() {
     const tracks = window.App.tracks || [];
 
+    // Subtitle in Hero
+    const heroSub = document.getElementById('home-hero-subtitle');
+    if (heroSub) {
+      heroSub.textContent = tracks.length > 0 ? `${tracks.length} songs in vault` : 'All your music. Everywhere.';
+    }
+
     // 1. Recently Played Carousel
     const recents = this.getRecentlyPlayedTracks();
     const displayRecents = recents.length > 0 ? recents.slice(0, 10) : tracks.slice(0, 8);
     const countEl = document.getElementById('home-recently-count');
     if (countEl) countEl.textContent = `${displayRecents.length} tracks`;
 
+    const recentSection = document.getElementById('home-recently-section');
+    if (recentSection) {
+      recentSection.style.display = displayRecents.length > 0 ? 'block' : 'none';
+    }
+
     const carouselEl = document.getElementById('home-recently-carousel');
-    if (carouselEl) {
-      if (displayRecents.length === 0) {
-        carouselEl.innerHTML = `
-          <div style="color: var(--apple-label-secondary); font-size: 13px; padding: 20px 0;">
-            No songs played yet. Forward audio files to the Telegram bot!
+    if (carouselEl && displayRecents.length > 0) {
+      carouselEl.innerHTML = displayRecents.map((t, idx) => `
+        <div class="recently-card" data-id="${t.id}" data-index="${idx}">
+          <div class="recently-artwork" id="recent-art-${t.id}">
+            ${t.type === 'voice' ? Icons.mic : Icons.musicNote}
           </div>
-        `;
-      } else {
-        carouselEl.innerHTML = displayRecents.map((t, idx) => `
-          <div class="recently-card" data-id="${t.id}" data-index="${idx}">
-            <div class="recently-artwork" id="recent-art-${t.id}">
-              ${t.type === 'voice' ? Icons.mic : Icons.musicNote}
-            </div>
-            <div class="recently-title">${this.escapeHTML(t.title)}</div>
-            <div class="recently-artist">${this.escapeHTML(t.performer)}</div>
-          </div>
-        `).join('');
+          <div class="recently-title">${this.escapeHTML(t.title)}</div>
+          <div class="recently-artist">${this.escapeHTML(t.performer)}</div>
+        </div>
+      `).join('');
 
-        carouselEl.querySelectorAll('.recently-card').forEach((card) => {
-          card.addEventListener('click', () => {
-            const trackId = card.dataset.id;
-            const t = tracks.find((x) => x.id === trackId);
-            if (t) {
-              window.TelegramBridge.haptic.impact('light');
-              window.AudioEngine.setQueue([t, ...tracks.filter((x) => x.id !== trackId)], 0, true);
-            }
-          });
-        });
-
-        // Load covers async
-        displayRecents.forEach((t) => {
-          if (t.type !== 'voice') {
-            window.ApiClient.getArtwork(t.title, t.performer).then((res) => {
-              if (res && res.artworkUrl) {
-                const el = document.getElementById(`recent-art-${t.id}`);
-                if (el) el.innerHTML = `<img src="${res.artworkUrl}" alt="" />`;
-              }
-            }).catch(() => {});
+      carouselEl.querySelectorAll('.recently-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          const trackId = card.dataset.id;
+          const t = tracks.find((x) => x.id === trackId);
+          if (t) {
+            window.TelegramBridge.haptic.impact('light');
+            window.AudioEngine.setQueue([t, ...tracks.filter((x) => x.id !== trackId)], 0, true);
           }
         });
-      }
+      });
+
+      // Load covers async
+      displayRecents.forEach((t) => {
+        if (t.type !== 'voice') {
+          window.ApiClient.getArtwork(t.title, t.performer).then((res) => {
+            if (res && res.artworkUrl) {
+              const el = document.getElementById(`recent-art-${t.id}`);
+              if (el) el.innerHTML = `<img src="${res.artworkUrl}" alt="" />`;
+            }
+          }).catch(() => {});
+        }
+      });
     }
 
     // 2. Quick Access Counts
@@ -730,51 +733,41 @@ const UI = {
     if (qcLiked) qcLiked.textContent = `${likedCount} songs`;
 
     const qcRecent = document.getElementById('qc-recent-count');
-    if (qcRecent) qcRecent.textContent = `${tracks.length} vault tracks`;
+    if (qcRecent) qcRecent.textContent = `${tracks.length} songs`;
 
     this.updateStorageStats();
 
-    // 3. Made for You / Mood Playlists
-    const moodGrid = document.getElementById('home-mood-grid');
-    if (moodGrid) {
-      moodGrid.innerHTML = `
-        <div class="mood-card" id="mood-flow" style="background: linear-gradient(135deg, rgba(10, 132, 255, 0.35) 0%, rgba(42, 171, 238, 0.2) 100%), #1c1c1e;">
-          <span class="mood-card-title">Focus & Flow</span>
-          <span class="mood-card-sub">Pure concentration</span>
-        </div>
-        <div class="mood-card" id="mood-chill" style="background: linear-gradient(135deg, rgba(191, 90, 242, 0.35) 0%, rgba(255, 59, 92, 0.2) 100%), #1c1c1e;">
-          <span class="mood-card-title">Night Chill</span>
-          <span class="mood-card-sub">Late night vibes</span>
-        </div>
-        <div class="mood-card" id="mood-top" style="background: linear-gradient(135deg, rgba(255, 159, 10, 0.35) 0%, rgba(255, 55, 95, 0.2) 100%), #1c1c1e;">
-          <span class="mood-card-title">🔥 Most Played</span>
-          <span class="mood-card-sub">${this.getMostPlayedTracks().length} top hits</span>
-        </div>
-        <div class="mood-card" id="mood-daily" style="background: linear-gradient(135deg, rgba(48, 209, 88, 0.35) 0%, rgba(100, 210, 255, 0.2) 100%), #1c1c1e;">
-          <span class="mood-card-title">Daily Mix</span>
-          <span class="mood-card-sub">Smart curated vault</span>
-        </div>
-      `;
+    // 3. Render ALL SONGS on Home Screen (صفحه اول تمام آهنگ‌ها)
+    const allTracksList = document.getElementById('home-all-tracks-list');
+    const allTracksCount = document.getElementById('home-all-tracks-count');
+    if (allTracksCount) allTracksCount.textContent = `(${tracks.length})`;
 
-      document.getElementById('mood-top')?.addEventListener('click', () => {
-        this.openPlaylistDetail({
-          id: 'smart_most',
-          name: '🔥 Most Played',
-          isDefault: true,
-          tracks: this.getMostPlayedTracks()
-        });
-      });
+    if (allTracksList) {
+      if (tracks.length === 0) {
+        allTracksList.innerHTML = `
+          <div class="empty-state" style="padding: 36px 16px;">
+            <div class="empty-icon">${Icons.musicNote}</div>
+            <div class="empty-title">صندوقچه صوتی خالی است</div>
+            <div class="empty-desc">برای افزودن آهنگ، هر فایل موسیقی را در چت تلگرام به ربات ارسال یا فوروارد کنید.</div>
+          </div>
+        `;
+      } else {
+        this.renderTrackListToContainer(tracks, allTracksList);
+      }
+    }
 
-      const playMood = () => {
+    // Home Shuffle All Button
+    const shuffleBtn = document.getElementById('btn-home-shuffle-all');
+    if (shuffleBtn) {
+      shuffleBtn.onclick = () => {
         if (tracks.length > 0) {
           window.TelegramBridge.haptic.impact('medium');
+          window.AudioEngine.isShuffle = true;
+          if (this.dom.btnShuffle) this.dom.btnShuffle.classList.add('active');
           window.AudioEngine.setQueue(tracks, Math.floor(Math.random() * tracks.length), true);
+          this.showToast('🔀 Shuffling all songs');
         }
       };
-
-      document.getElementById('mood-flow')?.addEventListener('click', playMood);
-      document.getElementById('mood-chill')?.addEventListener('click', playMood);
-      document.getElementById('mood-daily')?.addEventListener('click', playMood);
     }
   },
 
