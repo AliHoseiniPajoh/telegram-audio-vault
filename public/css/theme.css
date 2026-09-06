@@ -47,6 +47,16 @@
   --duration-normal: 260ms;
   --duration-sheet: 340ms;
 
+  /* Telegram Music Brand Tokens */
+  --tg-blue: #0a84ff;
+  --tg-cyan: #2aabee;
+  --tg-accent-gradient: linear-gradient(135deg, #2aabee 0%, #0a84ff 100%);
+  --tg-card-glass: rgba(255, 255, 255, 0.05);
+  --tg-card-border: rgba(255, 255, 255, 0.08);
+  --tg-card-hover: rgba(255, 255, 255, 0.09);
+  --nav-height: 56px;
+  --mini-player-height: 56px;
+
   /* Safe Area Spacing */
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);

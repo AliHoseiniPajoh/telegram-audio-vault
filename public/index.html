@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>صندوقچه صوتی شخصی</title>
+  <title>Telegram Music — Audio Vault</title>
   
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -15,226 +15,629 @@
 </head>
 <body>
   <div id="app">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="brand-badge">
-        <div class="brand-icon-box">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-          </svg>
+    <!-- App Header -->
+    <header class="app-header" id="app-header">
+      <div class="header-left" id="header-user-section">
+        <div class="header-avatar" id="header-avatar">U</div>
+        <div class="header-user-info">
+          <span class="header-greeting" id="header-greeting">Good to hear you</span>
+          <span class="header-username" id="header-username">Telegram Music</span>
         </div>
-        <span class="brand-title">صندوقچه صوتی</span>
       </div>
-      <div class="vault-badge" id="user-badge">
-        <span>شخصی</span>
+      <div class="header-actions">
+        <button class="header-icon-btn" id="btn-header-settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
       </div>
     </header>
 
-    <!-- Search Bar -->
-    <div class="search-container" id="search-container">
-      <div class="search-input-wrapper">
-        <span class="search-icon">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </span>
-        <input type="text" id="search-input" class="search-input" placeholder="جستجو در ترَک‌ها، پادکست‌ها و وویس‌ها..." />
-        <button id="search-clear" class="search-clear-btn" aria-label="پاک کردن">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-    </div>
+    <!-- Screen Views Container -->
+    <div class="screen-views-container" id="screen-views-container">
 
-    <!-- Navigation Tabs -->
-    <nav class="nav-tabs">
-      <button class="nav-tab active" id="tab-tracks">همه فایل‌ها</button>
-      <button class="nav-tab" id="tab-playlists">پلی‌لیست‌ها</button>
-    </nav>
+      <!-- SCREEN 01: HOME -->
+      <section class="screen-view active" id="view-home">
+        <!-- Hero Banner Card -->
+        <div class="hero-banner" id="home-hero-banner">
+          <div class="hero-content">
+            <span class="hero-eyebrow">Good to hear you</span>
+            <h1 class="hero-title">Play your world</h1>
+            <p class="hero-sub">All your music. Everywhere.</p>
+          </div>
+          <button class="hero-play-fab" id="home-hero-play-btn" aria-label="Play All">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
+          </button>
+        </div>
 
-    <!-- Scrollable Main View -->
-    <main class="content-view" id="content-view">
-      <!-- Dynamically filled by UI.js -->
-    </main>
+        <!-- Section: Recently Played Horizontal Carousel -->
+        <div class="section-container" id="home-recently-section">
+          <div class="section-header-row">
+            <h2 class="section-title">Recently Played</h2>
+            <span class="section-count" id="home-recently-count"></span>
+          </div>
+          <div class="horizontal-carousel" id="home-recently-carousel">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
 
-    <!-- Floating Mini Player (Bottom Bar) -->
+        <!-- Section: Quick Access 2x2 Grid -->
+        <div class="section-container">
+          <div class="section-header-row">
+            <h2 class="section-title">Quick Access</h2>
+          </div>
+          <div class="quick-access-grid">
+            <div class="quick-card" id="qc-liked">
+              <div class="quick-card-icon red">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              </div>
+              <div class="quick-card-meta">
+                <span class="quick-card-title">Liked Songs</span>
+                <span class="quick-card-sub" id="qc-liked-count">0 songs</span>
+              </div>
+            </div>
+
+            <div class="quick-card" id="qc-downloads">
+              <div class="quick-card-icon green">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              </div>
+              <div class="quick-card-meta">
+                <span class="quick-card-title">Downloaded</span>
+                <span class="quick-card-sub" id="qc-downloads-count">0 offline</span>
+              </div>
+            </div>
+
+            <div class="quick-card" id="qc-telegram">
+              <div class="quick-card-icon blue">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+              </div>
+              <div class="quick-card-meta">
+                <span class="quick-card-title">From Telegram</span>
+                <span class="quick-card-sub" id="qc-telegram-count">All chats</span>
+              </div>
+            </div>
+
+            <div class="quick-card" id="qc-recently-added">
+              <div class="quick-card-icon purple">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+              </div>
+              <div class="quick-card-meta">
+                <span class="quick-card-title">Recently Added</span>
+                <span class="quick-card-sub" id="qc-recent-count">New vault files</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Made For You / Smart Playlists -->
+        <div class="section-container">
+          <div class="section-header-row">
+            <h2 class="section-title">Made for You</h2>
+          </div>
+          <div class="mood-playlists-grid" id="home-mood-grid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 02: SEARCH -->
+      <section class="screen-view" id="view-search">
+        <!-- Search Inset Input -->
+        <div class="search-container">
+          <div class="search-input-wrapper">
+            <span class="search-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input type="text" id="search-input" class="search-input" placeholder="Search songs, artists, playlists..." />
+            <button id="search-clear" class="search-clear-btn" aria-label="Clear search">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Pills Bar -->
+        <div class="filter-pills-row" id="search-filter-pills">
+          <button class="pill-btn active" data-filter="all">All</button>
+          <button class="pill-btn" data-filter="songs">Songs</button>
+          <button class="pill-btn" data-filter="artists">Artists</button>
+          <button class="pill-btn" data-filter="playlists">Playlists</button>
+        </div>
+
+        <!-- Recent Searches & Telegram Sources (Shown when search input is empty) -->
+        <div class="search-explore-section" id="search-explore-section">
+          <div class="section-header-row">
+            <h3 class="section-title-sm">Recent Searches</h3>
+            <button class="text-btn-action" id="btn-clear-recent-searches">Clear All</button>
+          </div>
+          <div class="recent-searches-tags" id="recent-searches-list">
+            <!-- Filled dynamically -->
+          </div>
+
+          <div class="section-header-row" style="margin-top: 24px;">
+            <h3 class="section-title-sm">Telegram Sources</h3>
+          </div>
+          <div class="tg-sources-list">
+            <div class="tg-source-item" id="src-saved-messages">
+              <div class="tg-source-icon blue">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+              </div>
+              <div class="tg-source-meta">
+                <span class="tg-source-title">Saved Messages</span>
+                <span class="tg-source-desc">Audio sent to your personal chat</span>
+              </div>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--hint-color);"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </div>
+
+            <div class="tg-source-item" id="src-channels">
+              <div class="tg-source-icon cyan">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+              </div>
+              <div class="tg-source-meta">
+                <span class="tg-source-title">Channel Music & Hunter Bot</span>
+                <span class="tg-source-desc">Connected bots and music channels</span>
+              </div>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--hint-color);"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Results List -->
+        <div class="search-results-container" id="search-results-container">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- SCREEN 06: LIBRARY -->
+      <section class="screen-view" id="view-library">
+        <!-- Library Header Row -->
+        <div class="section-header-row" style="padding: 12px 16px 4px 16px;">
+          <h1 class="library-main-title">Library</h1>
+          <button class="library-add-pl-btn" id="btn-library-create-pl" title="New Playlist">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+        </div>
+
+        <!-- Liked Songs Hero Card (06 - Playlist Screen) -->
+        <div class="liked-songs-hero-card" id="card-liked-hero">
+          <div class="liked-hero-left">
+            <div class="liked-hero-icon-box">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            </div>
+            <div class="liked-hero-meta">
+              <h2 class="liked-hero-title">Liked Songs</h2>
+              <span class="liked-hero-count" id="lib-liked-count">0 songs</span>
+            </div>
+          </div>
+          <button class="hero-play-fab blue" id="btn-play-liked-hero" aria-label="Play Liked Songs">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
+          </button>
+        </div>
+
+        <!-- Quick Sub-Links -->
+        <div class="library-quick-links">
+          <div class="lib-quick-link" id="lib-link-downloads">
+            <div class="lib-quick-icon green">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </div>
+            <span>Downloaded</span>
+            <span class="lib-link-badge" id="lib-dl-badge">0</span>
+          </div>
+
+          <div class="lib-quick-link" id="lib-link-telegram">
+            <div class="lib-quick-icon blue">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+            </div>
+            <span>From Telegram</span>
+          </div>
+        </div>
+
+        <!-- Playlists List -->
+        <div class="section-header-row" style="padding: 16px 16px 8px 16px;">
+          <h2 class="section-title">Playlists</h2>
+        </div>
+        <div class="library-playlists-container" id="library-playlists-list">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- SCREEN 07: PLAYLIST DETAIL SUB-VIEW -->
+      <section class="screen-view sub-view" id="view-playlist-detail">
+        <div class="sub-view-header">
+          <button class="icon-btn-back" id="btn-back-playlist">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <span class="sub-view-header-title" id="pl-detail-nav-title">Playlist</span>
+          <button class="icon-btn" id="btn-pl-options" aria-label="Playlist Options">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="12" r="2"/></svg>
+          </button>
+        </div>
+
+        <div class="playlist-detail-hero">
+          <div class="playlist-detail-cover" id="pl-detail-cover">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle><path d="M3 6h3M3 10h3M3 14h3"></path></svg>
+          </div>
+          <h1 class="playlist-detail-title" id="pl-detail-title">Playlist Title</h1>
+          <div class="playlist-detail-sub" id="pl-detail-sub">0 songs • 0 min</div>
+
+          <!-- Action Row (07 - Playlist Detail) -->
+          <div class="playlist-detail-actions">
+            <button class="btn-pill-action" id="btn-pl-add-songs">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Add</span>
+            </button>
+            <button class="btn-pill-action destructive" id="btn-pl-delete" style="display: none;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <span>Delete</span>
+            </button>
+            <button class="hero-play-fab blue" id="btn-pl-play-all" aria-label="Play All">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Playlist Tracks List -->
+        <div class="playlist-tracks-container" id="pl-detail-tracks">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- SCREEN 11: DOWNLOADED SUB-VIEW -->
+      <section class="screen-view sub-view" id="view-downloads">
+        <div class="sub-view-header">
+          <button class="icon-btn-back" id="btn-back-downloads">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <span class="sub-view-header-title">Downloaded</span>
+          <div style="width: 36px;"></div>
+        </div>
+
+        <div class="downloads-hero-banner">
+          <div class="downloads-hero-left">
+            <h2 class="downloads-hero-title">Offline Storage</h2>
+            <div class="downloads-hero-sub" id="downloads-storage-text">Calculating storage...</div>
+          </div>
+          <button class="btn-pill-action blue" id="btn-downloads-shuffle">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+            <span>Shuffle All</span>
+          </button>
+        </div>
+
+        <div class="downloads-tracks-container" id="downloads-tracks-list">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- SCREEN 12: FROM TELEGRAM SUB-VIEW -->
+      <section class="screen-view sub-view" id="view-telegram">
+        <div class="sub-view-header">
+          <button class="icon-btn-back" id="btn-back-telegram">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <span class="sub-view-header-title">From Telegram</span>
+          <div style="width: 36px;"></div>
+        </div>
+
+        <div class="telegram-sources-summary">
+          <div class="tg-summary-card">
+            <span class="tg-summary-number" id="tg-total-count">0</span>
+            <span class="tg-summary-label">Synced Audios</span>
+          </div>
+          <div class="tg-summary-card">
+            <span class="tg-summary-number" id="tg-channels-count">Saved</span>
+            <span class="tg-summary-label">Cloud Sources</span>
+          </div>
+        </div>
+
+        <div class="telegram-tracks-container" id="telegram-tracks-list">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- SCREEN 13: SETTINGS SUB-VIEW -->
+      <section class="screen-view sub-view" id="view-settings">
+        <div class="sub-view-header">
+          <button class="icon-btn-back" id="btn-back-settings">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <span class="sub-view-header-title">Settings</span>
+          <div style="width: 36px;"></div>
+        </div>
+
+        <!-- User Profile Card -->
+        <div class="settings-user-card">
+          <div class="settings-user-avatar" id="settings-avatar">U</div>
+          <div class="settings-user-meta">
+            <h2 class="settings-user-name" id="settings-name">User</h2>
+            <span class="settings-user-handle" id="settings-handle">@username</span>
+          </div>
+          <span class="settings-badge-pro">PRO</span>
+        </div>
+
+        <!-- Settings Groups -->
+        <div class="settings-group">
+          <div class="settings-group-title">PLAYBACK & AUDIO</div>
+          
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-item-icon blue">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+              </div>
+              <div class="settings-item-text">
+                <span class="settings-item-title">Streaming Quality</span>
+                <span class="settings-item-sub">Lossless High Bitrate</span>
+              </div>
+            </div>
+            <span class="settings-tag-pill">320 kbps</span>
+          </div>
+
+          <div class="settings-item" id="setting-sleep-timer-btn">
+            <div class="settings-item-left">
+              <div class="settings-item-icon purple">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              </div>
+              <div class="settings-item-text">
+                <span class="settings-item-title">Sleep Timer</span>
+                <span class="settings-item-sub" id="setting-sleep-sub">Off</span>
+              </div>
+            </div>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--hint-color);"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">STORAGE & CACHE</div>
+
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-item-icon green">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              </div>
+              <div class="settings-item-text">
+                <span class="settings-item-title">Offline Music Storage</span>
+                <span class="settings-item-sub" id="settings-cache-size">Calculating...</span>
+              </div>
+            </div>
+            <button class="btn-clear-cache" id="btn-clear-cache">Clear</button>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">ABOUT</div>
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-item-icon blue">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+              </div>
+              <div class="settings-item-text">
+                <span class="settings-item-title">Telegram Audio Vault</span>
+                <span class="settings-item-sub">v2.0 • Ultra HD Audio</span>
+              </div>
+            </div>
+            <span class="settings-tag-pill green">Active</span>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /screen-views-container -->
+
+    <!-- FLOATING MINI PLAYER (Docked above Bottom Nav) -->
     <div class="mini-player hidden" id="mini-player">
       <div class="mini-player-progress" id="mini-progress"></div>
       <div class="mini-artwork" id="mini-artwork"></div>
       <div class="mini-info">
-        <div class="mini-title" id="mini-title">عنوان ترَک</div>
-        <div class="mini-artist" id="mini-artist">نام هنرمند</div>
+        <div class="mini-title" id="mini-title">Track Title</div>
+        <div class="mini-artist" id="mini-artist">Artist Name</div>
       </div>
       <div class="mini-controls">
-        <button class="mini-play-btn" id="mini-play-btn" aria-label="پخش/توقف"></button>
-        <button class="icon-btn" id="mini-next-btn" aria-label="ترک بعدی">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
-          </svg>
+        <button class="mini-play-btn" id="mini-play-btn" aria-label="Play/Pause"></button>
+        <button class="icon-btn" id="mini-next-btn" aria-label="Next Track">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
         </button>
       </div>
     </div>
 
-    <!-- Expandable Full-Screen Sheet Player -->
+    <!-- FIXED 3-TAB BOTTOM NAVIGATION BAR -->
+    <nav class="bottom-nav" id="bottom-nav">
+      <button class="bottom-nav-item active" id="nav-tab-home" data-tab="home">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </div>
+        <span class="nav-label">Home</span>
+      </button>
+
+      <button class="bottom-nav-item" id="nav-tab-search" data-tab="search">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </div>
+        <span class="nav-label">Search</span>
+      </button>
+
+      <button class="bottom-nav-item" id="nav-tab-library" data-tab="library">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle><path d="M3 6h3M3 10h3M3 14h3"></path></svg>
+        </div>
+        <span class="nav-label">Library</span>
+      </button>
+    </nav>
+
+    <!-- FULLSCREEN EXPANDED SHEET PLAYER (Screens 03, 04, 05) -->
     <div class="expanded-player" id="expanded-player">
       <!-- Dynamic Ambient Glow Backdrop -->
       <div class="ambient-glow" id="ambient-glow"></div>
 
+      <!-- Sheet Header Nav -->
       <div class="sheet-header">
         <div class="drag-pill"></div>
         <div class="sheet-nav">
-          <button class="icon-btn" id="expanded-close-btn" aria-label="بستن پلیر">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
+          <button class="icon-btn" id="expanded-close-btn" aria-label="Dismiss Player">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
           </button>
-          <span class="sheet-nav-title">در حال پخش</span>
-          <div style="width: 40px;"></div> <!-- Spacer for symmetry -->
-        </div>
-      </div>
-
-      <!-- Artwork & Visualizer -->
-      <div class="artwork-wrapper" id="artwork-wrapper">
-        <div class="artwork-card" id="artwork-card">
-          <div class="soundwave">
-            <div class="soundwave-bar"></div>
-            <div class="soundwave-bar"></div>
-            <div class="soundwave-bar"></div>
-            <div class="soundwave-bar"></div>
-            <div class="soundwave-bar"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Synced Lyrics View (Apple Music Style) -->
-      <div class="lyrics-wrapper hidden" id="lyrics-wrapper">
-        <div class="lyrics-topbar">
-          <span class="lyrics-badge">متن هماهنگ ترانه</span>
-          <button class="lyrics-close-btn" id="btn-close-lyrics" aria-label="بستن متن">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+          <div class="sheet-nav-pill" id="expanded-nav-pill">Playing from Library</div>
+          <button class="icon-btn" id="expanded-more-btn" aria-label="More">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="12" r="2"/></svg>
           </button>
         </div>
-        <div class="lyrics-scroller" id="lyrics-scroller">
-          <div class="lyrics-list" id="lyrics-list">
-            <!-- Populated dynamically by UI.js -->
+      </div>
+
+      <!-- PLAYER MULTI-PANEL VIEW CONTAINER -->
+      <div class="player-panels-container">
+        
+        <!-- PANEL 1: NOW PLAYING (03 - Full Player) -->
+        <div class="player-panel active" id="panel-now-playing">
+          <!-- Large Artwork & Visualizer -->
+          <div class="artwork-wrapper" id="artwork-wrapper">
+            <div class="artwork-card" id="artwork-card">
+              <div class="soundwave">
+                <div class="soundwave-bar"></div>
+                <div class="soundwave-bar"></div>
+                <div class="soundwave-bar"></div>
+                <div class="soundwave-bar"></div>
+                <div class="soundwave-bar"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metadata & Heart -->
+          <div class="track-meta">
+            <div class="track-meta-row">
+              <div class="track-meta-text">
+                <h2 class="track-meta-title" id="expanded-title">Track Title</h2>
+                <div class="track-meta-artist" id="expanded-artist">Artist Name</div>
+              </div>
+              <button class="icon-btn btn-like" id="btn-like" aria-label="Favorite"></button>
+            </div>
+          </div>
+
+          <!-- Scrubber -->
+          <div class="scrubber-container">
+            <input type="range" class="seek-slider" id="seek-slider" min="0" max="100" value="0" step="0.1" />
+            <div class="time-row">
+              <span id="current-time">0:00</span>
+              <span id="total-time">0:00</span>
+            </div>
+          </div>
+
+          <!-- Main Controls Row -->
+          <div class="controls-row">
+            <button class="ctrl-btn" id="btn-shuffle" aria-label="Shuffle">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+            </button>
+
+            <button class="ctrl-btn" id="btn-prev" aria-label="Previous">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+
+            <button class="ctrl-btn ctrl-btn-primary" id="btn-play" aria-label="Play"></button>
+
+            <button class="ctrl-btn" id="btn-next" aria-label="Next">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+
+            <button class="ctrl-btn" id="btn-repeat" aria-label="Repeat">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+            </button>
+          </div>
+
+          <!-- Action Strip -->
+          <div class="action-strip">
+            <button class="chip-btn" id="btn-sleep" title="Sleep Timer">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              <span id="btn-sleep-text">Sleep</span>
+            </button>
+            <button class="chip-btn" id="btn-speed">1.0x</button>
+            <button class="chip-btn" id="btn-add-to-pl">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Add to Playlist</span>
+            </button>
+            <button class="chip-btn" id="btn-download-expanded" title="Download offline">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span id="btn-download-expanded-text">Download</span>
+            </button>
+            <button class="chip-btn" id="btn-play-native" title="Open in Telegram player">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              <span>Play in Telegram</span>
+            </button>
           </div>
         </div>
-      </div>
 
-      <!-- Metadata -->
-      <div class="track-meta">
-        <div class="track-meta-row">
-          <div class="track-meta-text">
-            <h2 class="track-meta-title" id="expanded-title">عنوان فایل</h2>
-            <div class="track-meta-artist" id="expanded-artist">هنرمند</div>
+        <!-- PANEL 2: UP NEXT / QUEUE (04 - Queue Screen) -->
+        <div class="player-panel" id="panel-queue">
+          <div class="queue-container">
+            <div class="queue-section-title">PLAYING NOW</div>
+            <div class="queue-now-playing-card" id="queue-now-card">
+              <!-- Dynamic -->
+            </div>
+
+            <div class="queue-section-header">
+              <span class="queue-section-title">NEXT IN QUEUE</span>
+              <button class="text-btn-action" id="btn-clear-queue">Clear</button>
+            </div>
+            <div class="queue-tracks-list" id="panel-queue-list">
+              <!-- Dynamic -->
+            </div>
           </div>
-          <button class="icon-btn btn-like" id="btn-like" aria-label="علاقه‌مندی"></button>
         </div>
-      </div>
 
-      <!-- Scrubber -->
-      <div class="scrubber-container">
-        <input type="range" class="seek-slider" id="seek-slider" min="0" max="100" value="0" step="0.1" />
-        <div class="time-row">
-          <span id="current-time">0:00</span>
-          <span id="total-time">0:00</span>
+        <!-- PANEL 3: LYRICS (05 - Lyrics Screen) -->
+        <div class="player-panel" id="panel-lyrics">
+          <div class="lyrics-wrapper" id="lyrics-wrapper">
+            <div class="lyrics-scroller" id="lyrics-scroller">
+              <div class="lyrics-list" id="lyrics-list">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
         </div>
+
+      </div><!-- /player-panels-container -->
+
+      <!-- BOTTOM 3-PILL SWITCHER (Screens 03, 04, 05) -->
+      <div class="player-bottom-switcher">
+        <button class="switcher-pill active" id="pill-switch-playing" data-panel="panel-now-playing">NOW PLAYING</button>
+        <button class="switcher-pill" id="pill-switch-queue" data-panel="panel-queue">UP NEXT</button>
+        <button class="switcher-pill" id="pill-switch-lyrics" data-panel="panel-lyrics">LYRICS</button>
       </div>
+    </div><!-- /expanded-player -->
 
-      <!-- Controls Row -->
-      <div class="controls-row">
-        <button class="ctrl-btn" id="btn-shuffle" aria-label="پخش تصادفی">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line>
-            <polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line>
-            <line x1="4" y1="4" x2="9" y2="9"></line>
-          </svg>
-        </button>
-
-        <button class="ctrl-btn" id="btn-prev" aria-label="ترک قبلی">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
-            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
-          </svg>
-        </button>
-
-        <button class="ctrl-btn ctrl-btn-primary" id="btn-play" aria-label="پخش"></button>
-
-        <button class="ctrl-btn" id="btn-next" aria-label="ترک بعدی">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
-            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
-          </svg>
-        </button>
-
-        <button class="ctrl-btn" id="btn-repeat" aria-label="حالت تکرار">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
-            <polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Action Strip -->
-      <div class="action-strip">
-        <button class="chip-btn" id="btn-lyrics" title="متن زنده ترانه">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-            <line x1="9" y1="9" x2="15" y2="9"></line>
-            <line x1="9" y1="13" x2="13" y2="13"></line>
-          </svg>
-          <span>متن ترانه</span>
-        </button>
-        <button class="chip-btn" id="btn-sleep" title="تایمر خواب هوشمند">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-          <span id="btn-sleep-text">تایمر خواب</span>
-        </button>
-        <button class="chip-btn" id="btn-speed">1.0x</button>
-        <button class="chip-btn" id="btn-queue">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-          <span>صف پخش</span>
-        </button>
-        <button class="chip-btn" id="btn-add-to-pl">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          <span>پلی‌لیست</span>
-        </button>
-        <button class="chip-btn" id="btn-download-expanded" title="دانلود و ذخیره دائمی در حافظه گوشی">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          <span id="btn-download-expanded-text">دانلود آفلاین</span>
-        </button>
-        <button class="chip-btn" id="btn-play-native" title="پخش در پلیر اصلی تلگرام (بدون ۱ بایت دانلود مجدد)">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-          </svg>
-          <span>پخش در تلگرام</span>
-        </button>
+    <!-- SCREEN 09: ADD TO PLAYLIST MODAL SHEET -->
+    <div class="sheet-modal-overlay" id="modal-add-to-playlist">
+      <div class="sheet-modal-box">
+        <div class="sheet-modal-header">
+          <span class="sheet-modal-title">Add to Playlist</span>
+          <button class="sheet-modal-close" id="btn-close-add-pl-modal">&times;</button>
+        </div>
+        <!-- Track Preview Mini Row -->
+        <div class="sheet-track-preview" id="add-pl-track-preview">
+          <div class="track-preview-thumb" id="add-pl-track-thumb"></div>
+          <div class="track-preview-info">
+            <div class="track-preview-title" id="add-pl-track-title">Song Title</div>
+            <div class="track-preview-artist" id="add-pl-track-artist">Artist</div>
+          </div>
+        </div>
+        <!-- Playlist Filter Input -->
+        <div class="sheet-search-wrapper">
+          <input type="text" class="sheet-search-input" id="add-pl-search-input" placeholder="Find a playlist..." />
+        </div>
+        <!-- Playlists Checklist -->
+        <div class="sheet-playlists-list" id="add-pl-list">
+          <!-- Dynamic -->
+        </div>
+        <div class="sheet-modal-footer">
+          <button class="btn-primary-blue full" id="btn-add-pl-confirm">Done</button>
+        </div>
       </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Generic Modals Overlay -->
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal-box">
-        <div class="modal-title" id="modal-title">عنوان مودال</div>
+        <div class="modal-title" id="modal-title">Title</div>
         <div id="modal-body"></div>
         <div class="modal-actions" id="modal-actions"></div>
       </div>
     </div>
 
     <!-- Toast Notification -->
-    <div class="toast-msg" id="toast-msg">پیام سیستم</div>
-  </div>
+    <div class="toast-msg" id="toast-msg">System notification</div>
+  </div><!-- /app -->
 
   <!-- Client JavaScript Modules -->
   <script src="js/icons.js"></script>

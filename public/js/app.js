@@ -20,13 +20,21 @@ const App = {
       const auth = await window.ApiClient.getMe();
       console.log('✅ Authenticated with Audio Vault:', auth);
       
-      // Update header badge with user name or lock icon
-      const userBadge = document.getElementById('user-badge');
-      if (userBadge && auth.user?.first_name) {
-        userBadge.textContent = auth.user.first_name;
+      // Update header user display
+      const usernameEl = document.getElementById('header-username');
+      const avatarEl = document.getElementById('header-avatar');
+      if (auth.user?.first_name) {
+        if (usernameEl) usernameEl.textContent = auth.user.first_name;
+        if (avatarEl) {
+          if (auth.user.photo_url) {
+            avatarEl.innerHTML = `<img src="${auth.user.photo_url}" alt="" />`;
+          } else {
+            avatarEl.textContent = auth.user.first_name.charAt(0).toUpperCase();
+          }
+        }
       }
 
-      // Initial data fetch: preload playlists so Favorites state is known immediately
+      // Initial data fetch: preload playlists and tracks
       try {
         this.playlists = await window.ApiClient.getPlaylists();
       } catch (_) {}
@@ -46,17 +54,18 @@ const App = {
       window.UI.renderTracks(this.tracks);
     } catch (err) {
       console.error('Failed to load tracks:', err);
-      window.UI.showToast('خطا در دریافت لیست ترک‌ها');
+      window.UI.showToast('Error loading tracks');
     }
   },
 
   async loadPlaylists() {
     try {
       this.playlists = await window.ApiClient.getPlaylists();
-      window.UI.renderPlaylists(this.playlists);
+      if (window.UI.currentTab === 'library') {
+        window.UI.renderLibraryScreen();
+      }
     } catch (err) {
       console.error('Failed to load playlists:', err);
-      window.UI.showToast('خطا در دریافت پلی‌لیست‌ها');
     }
   },
 
@@ -68,22 +77,24 @@ const App = {
       }
     } catch (err) {
       console.error('Failed to load playlist:', err);
-      window.UI.showToast('خطا در دریافت جزئیات پلی‌لیست');
+      window.UI.showToast('Error loading playlist');
     }
   },
 
   handleSearch(query) {
     this.activeSearch = query;
-    this.loadTracks(query);
+    window.UI.handleSearchInput(query);
   },
 
   refreshCurrentView() {
-    if (window.UI.currentTab === 'tracks') {
-      this.loadTracks(this.activeSearch);
-    } else if (window.UI.activePlaylistId) {
+    if (window.UI.activeSubView === 'playlist-detail' && window.UI.activePlaylistId) {
       this.loadPlaylistDetails(window.UI.activePlaylistId);
+    } else if (window.UI.currentTab === 'home') {
+      window.UI.renderHomeScreen();
+    } else if (window.UI.currentTab === 'library') {
+      window.UI.renderLibraryScreen();
     } else {
-      this.loadPlaylists();
+      window.UI.renderSearchScreen();
     }
   },
 
@@ -94,9 +105,9 @@ const App = {
         <div style="width: 72px; height: 72px; border-radius: 24px; background: rgba(255, 73, 88, 0.12); display: flex; align-items: center; justify-content: center; color: var(--destructive-color); margin-bottom: 20px;">
           ${Icons.shieldLock}
         </div>
-        <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">دسترسی کاملاً خصوصی</h1>
+        <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">Private Audio Vault</h1>
         <p style="font-size: 14px; color: var(--hint-color); line-height: 1.6; max-width: 300px; margin-bottom: 20px;">
-          این صندوقچه صوتی منحصراً برای کاربر مالک پیکربندی شده است و هیچ‌گونه دسترسی عمومی ندارد.
+          This audio vault is configured exclusively for its owner and is completely private.
         </p>
         <div style="font-size: 11px; padding: 6px 12px; border-radius: 8px; background: var(--secondary-bg-color); color: var(--hint-color);">
           ${window.UI.escapeHTML(reason || 'Unauthorized')}
