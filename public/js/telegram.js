@@ -10,6 +10,11 @@ const TelegramBridge = {
     if (this.tg) {
       this.tg.ready();
       this.tg.expand();
+      if (typeof this.tg.disableVerticalSwipes === 'function') {
+        try {
+          this.tg.disableVerticalSwipes();
+        } catch (_) {}
+      }
 
       // Synchronize CSS variables and theme classes
       this.syncTheme();
