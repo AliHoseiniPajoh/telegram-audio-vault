@@ -28,7 +28,6 @@ app.use((req, res, next) => {
 const bot = initBot();
 
 // --- Vercel Telegram Webhook Handler ---
-// IMPORTANT: Do not pass 'res' to bot.handleUpdate so Telegraf uses direct Telegram Bot API calls
 app.post('/api/webhook', async (req, res) => {
   if (!bot) {
     console.warn('[Webhook] Bot is not initialized');
@@ -37,13 +36,17 @@ app.post('/api/webhook', async (req, res) => {
 
   try {
     if (req.body && typeof req.body === 'object') {
-      await bot.handleUpdate(req.body);
+      // Race against an 8s timeout to guarantee a 200 OK reaches Telegram before Vercel kills the container
+      await Promise.race([
+        bot.handleUpdate(req.body),
+        new Promise((resolve) => setTimeout(resolve, 8000))
+      ]);
     }
   } catch (err) {
     console.error('[Webhook Handle Error]', err.message);
   }
 
-  // Always respond 200 OK to Telegram so Telegram does not retry
+  // Always respond 200 OK to Telegram so Telegram never queues or retries
   if (!res.headersSent) {
     res.status(200).send('OK');
   }
@@ -65,7 +68,8 @@ app.get('/api/setup-webhook', async (req, res) => {
     const currentDomain = `${proto}://${host}`;
     const webhookUrl = `${currentDomain}/api/webhook`;
 
-    await bot.telegram.setWebhook(webhookUrl);
+    // Drop pending stale updates to prevent backlog congestion
+    await bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
     const info = await bot.telegram.getWebhookInfo();
 
     const allowedId = config.allowedUserId || 'تنظیم نشده (توصیه: در Vercel ثبت شود)';

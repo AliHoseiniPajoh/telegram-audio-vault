@@ -140,6 +140,9 @@ function initBot() {
         await ctx.reply(replyText, extra);
       } catch (err) {
         console.error('[Reply Error]', err.message);
+        try {
+          await ctx.reply(replyText);
+        } catch (_) {}
       }
     } else if (ctx.chat?.type === 'channel' && config.allowedUserId) {
       // In channel post, notify owner privately in their bot chat
